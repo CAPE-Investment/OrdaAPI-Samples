@@ -1,0 +1,102 @@
+# Visual Studio user settings and caches (including VS2010)
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sdf
+*.opensdf
+ipch/
+*.ncb
+*.VC.db
+*.VC.VC.opendb
+
+# Build and intermediate directories
+[Dd]ebug/
+[Rr]elease/
+[Dd]ebugPS/
+[Rr]eleasePS/
+[Bb]uild/
+[Oo]ut/
+[Bb]in/
+[Oo]bj/
+
+# C++ generated files; SDK libraries are not globally excluded
+*.obj
+*.pch
+*.pdb
+*.idb
+*.ilk
+*.ipch
+*.tlog
+*.lastbuildstate
+*.res
+*.exe
+*.exp
+*.manifest.intermediate
+*_manifest.rc
+
+# Temporary files and logs
+*.tmp
+*.temp
+*.bak
+*.log
+~$*
+
+# Runtime output and local configuration (examples remain trackable)
+[Ll]ogs/
+[Rr]esults/
+[Oo]utput/
+[Ll]ocal/
+*.local.*
+config.local
+config.json
+settings.json
+.env
+.env.*
+!.env.example
+!*.example.*
+
+# Local credentials, tokens and session caches
+[Ss]ecrets/
+[Cc]redentials/
+[Tt]okens/
+[Ss]essions/
+credentials.json
+token.json
+session.json
+*.key
+*.pem
+*.pfx
+*.p12
+
+# Keep .sln, .vcxproj, .vcxproj.filters, .props, .targets and source resources
+
+# Shared product runtime is a complete distribution unit, not sample output.
+# Preserve every supplied runtime file; external publication requires review.
+!/sdk/bin/
+!/sdk/bin/**
+
+# SDK runtime distribution
+!/sdk/bin/
+!/sdk/bin/**
+
+# Exclude build and link artifacts
+/sdk/bin/**/*.lib
+/sdk/bin/**/*.exp
+/sdk/bin/**/*.pdb
+/sdk/bin/**/*.obj
+/sdk/bin/**/*.idb
+/sdk/bin/**/*.ilk
+
+# SDK system directory: track only system.ini
+/sdk/bin/sys/*
+!/sdk/bin/sys/system.ini
+
+# Exclude runtime logs
+/sdk/bin/log/
+
+# Customer-facing documentation only
+/docs/*
+!/docs/getting-started.md
+!/docs/sample-index.md
+!/docs/troubleshooting.md

@@ -1,0 +1,40 @@
+CertRSA01			# KISA (한국정보보호진흥원)
+CrossCertCA			# CrossCert (한국전자인증)
+signGATE CA			# KICA, SignGATE (한국정보인증)
+NCASign CA			# NCASign (한국전산원)
+SignKorea CA		# SignKorea (한국증권전산)
+TradeSignCA			# TrageSign (한국무역정보통신)
+yessignCA 			# Yessign (금융결제원)
+{	
+	1.2.410.200005.1.1.1		# 전자거래 서명용 개인		
+	1.2.410.200005.1.1.11		# 전자거래 암호화 개인		
+	1.2.410.200005.1.1.2		# 금융거래 서명용 법인		
+	1.2.410.200005.1.1.22		# 금융거래 암호화 법인	
+#	1.2.410.200005.1.1.33		# 서버 암호화	
+#	1.2.410.200005.1.1.3		# 서버 서명용
+	1.2.410.200005.1.1.4		# 은행보험 서명용 개인
+	1.2.410.200005.1.1.44 		# 은행보험 암호화 개인
+	1.2.410.200005.1.1.5		# 전자거래 서명용 법인		
+	1.2.410.200005.1.1.55		# 전자거래 서명용 법인
+	1.2.410.200005.1.1.6.1		# 기업뱅킹용도제한 서명용 개인
+	1.2.410.200005.1.1.6.11 	# 기업뱅킹용도제한 암호화 개인
+	1.2.410.200005.1.1.6.2		# 신용카드 서명용 개인
+	1.2.410.200005.1.1.6.22 	# 신용카드 암호화 개인
+	1.2.410.200005.1.1.6.9		# 보안메일 서명용 개인
+	1.2.410.200005.1.1.6.99		# 보안메일 암호화 개인
+}
+CA131000002			# GPKI (행정자치부)
+CA131000001			# GPKI (행정자치부)
+yessignCA-TEST
+MND CA				# 국방부
+mpki mnd ca			# 국방부 테스트
+
+signGATE FTCA02		# TEST: KICA, SignGATE (한국정보인증) : RFC3280
+NCATESTSign3280CA	# TEST: NCASign (한국전산원) : RFC3280
+TestTradeSignCA		# TEST: TrageSign (한국무역정보통신) : RFC3280
+
+# RFC3280 Real
+KISA RootCA 1
+CrossCert Certificate Authority
+signGATE CA2
+NCASignCA
