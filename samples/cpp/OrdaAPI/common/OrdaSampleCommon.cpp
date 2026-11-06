@@ -195,6 +195,38 @@ void Cleanup()
     SetWindowTextA(g_certPassword, "");
 }
 
+// Opt-in retry only: existing samples retain their one-attempt behavior.
+// The caller must finish Cleanup and join its worker before resetting UI state.
+BOOL ResetAfterCleanup(HWND window)
+{
+    if (g_api || g_busy || !IsWindow(window))
+        return FALSE;
+    // Old session notifications must not change the new session's login state.
+    MSG message;
+    while (PeekMessage(&message, window, API_MESSAGE_BASE + WM_DISCONNECT,
+                       API_MESSAGE_BASE + WM_TIMEOUT_DATA, PM_REMOVE)) {}
+    while (PeekMessage(&message, window, SHOW_LOGIN_RESULT, SHOW_LOGIN_RESULT, PM_REMOVE)) {}
+    g_ready = FALSE;
+    g_closing = FALSE;
+    g_closeRequested = FALSE;
+    g_connectAttempted = FALSE;
+    g_initialized = FALSE;
+    g_loginResultPending = FALSE;
+    SecureZeroMemory(g_resultCode, sizeof(g_resultCode));
+    SecureZeroMemory(g_resultMessage, sizeof(g_resultMessage));
+    SetWindowTextA(g_password, "");
+    SetWindowTextA(g_certPassword, "");
+    SetWindowTextW(g_connection, L"접속 전");
+    SetWindowTextW(g_login, L"로그인 전");
+    SetWindowTextA(g_code, "");
+    SetWindowTextW(g_message, L"접속정보를 확인하고 비밀번호를 다시 입력하세요.");
+    HWND inputs[] = {g_devRadio, g_prodRadio, g_server, g_port, g_id, g_password, g_certPassword};
+    for (int i = 0; i < _countof(inputs); ++i)
+        EnableWindow(inputs[i], TRUE);
+    EnableWindow(g_loginButton, FALSE); // Initialize enables it after a successful load
+    return TRUE;
+}
+
 HWND AddControl(HWND parent, const wchar_t* type, const wchar_t* text,
                 DWORD style, int x, int y, int width, int height, int id)
 {

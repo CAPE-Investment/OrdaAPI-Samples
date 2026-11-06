@@ -9,3 +9,5 @@ Sample은 `CreateLoginControls` 후 `Initialize`를 호출하고 WndProc에서 `
 `Api()`가 반환하는 인스턴스는 Helper 소유입니다. Sample은 이를 삭제하지 않습니다. 서비스 코드·입력 구성·RequestData·조회/실시간 메시지·출력 파싱·조회 데이터 수명 및 해제는 각 Sample에서 직접 구현합니다. Helper가 Query 메시지를 소비하거나 결과를 파싱하지 않습니다.
 
 Runtime 작업 폴더는 공통 `sdk/bin`이며 실행 중 유지합니다. Cloud Login은 지원하지 않습니다. 운영서버 인증정보는 사용자가 직접 입력합니다. 첫 사용 예는 [t1001](../02_query/t1001-current-price/README.md)입니다.
+
+같은 프로세스에서 로그인 재시도가 필요한 Sample은 Cleanup 및 API worker 종료 후 UI 스레드에서 ResetAfterCleanup(window)를 호출하고 Initialize를 다시 호출할 수 있습니다. API 인스턴스가 남아 있거나 Helper 호출 중이면 초기화를 거부합니다. 이전 통지·로그인 상태와 비밀번호를 지우고 입력을 다시 활성화하며 서버·ID는 유지합니다. 선택적 기능이므로 기존 Sample의 한 번 로그인 흐름은 유지됩니다. S3T Sample에서 사용합니다.

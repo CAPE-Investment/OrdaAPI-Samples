@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -6,7 +6,7 @@
 #include <ordalib.h>
 
 // Source helper: compile OrdaSampleCommon.cpp in each sample (no extra DLL/lib).
-// One window/session and one ID-login attempt per process, as in 01_connection/login.
+// One window/session; retry is opt-in through ResetAfterCleanup.
 namespace OrdaSampleCommon
 {
     const UINT API_MESSAGE_BASE = WM_APP + 100;
@@ -25,6 +25,9 @@ namespace OrdaSampleCommon
     // Returns FALSE and defers WM_CLOSE if called from a nested API notification.
     BOOL BeginClose();
     void Cleanup();
+    // UI thread only, after Cleanup and any API worker have completed.
+    // Keeps server/ID inputs, clears credentials/old notifications; then call Initialize.
+    BOOL ResetAfterCleanup(HWND window);
     void SetResult(const wchar_t* message);
     void ShowCallResult(const wchar_t* stage, int result);
     void SetServerResult(const char* code, const char* message);
