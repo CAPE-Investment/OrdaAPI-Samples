@@ -1,44 +1,51 @@
-# t3084 선물마스터 조회 — Header Type A / 반복 Block
+﻿# t3084 — 선물마스터조회(t3084)
 
-[XML 정의](../../../../../sdk/bin/sys/t3084.xml)에 대응하는 A의 반복 출력 대표 Sample입니다. 실제 서버 검증이 끝난 t1001은 같은 A의 단일 출력 기준으로 그대로 유지합니다. 이 Sample의 실제 서버 Login/Query는 자동 수행하지 않았습니다.
+[main.cpp](OrdaAPI-t3084-FuturesMaster/main.cpp)에서 입력 구성, 요청 API, 응답 처리와 종료 순서를 확인할 수 있습니다.
 
-## 개발 환경 및 실행
+## 빌드와 실행
 
-VS2010 / v100 / Win32 / MultiByte / WinAPI, No MFC, No C++11 환경입니다. `OrdaAPI-t3084-FuturesMaster.sln`을 열어 Debug/Release Win32로 빌드합니다. [공통 접속/Login Helper](../../common/README.md)를 Source로 직접 컴파일하고 `sdk/include`, `sdk/bin`을 공유합니다. Debugging Working Directory 및 IDE 밖의 작업 폴더는 `sdk/bin`입니다. 실행 파일은 Sample의 `bin/Debug` 또는 `bin/Release`입니다.
+- Visual Studio 2010 / v100 / Win32 / MultiByte / C++03 / 순수 WinAPI입니다.
+- `OrdaAPI-t3084-FuturesMaster.sln`을 열고 Debug 또는 Release / Win32로 빌드합니다.
+- SDK Header는 `sdk/include`, 전문 구조체는 `sdk/structs/cpp`를 참조합니다. `ORDAAPI_INCLUDE_DIR` 재정의를 지원합니다.
+- 디버거 작업 폴더는 저장소의 `sdk/bin`입니다. IDE 밖에서 실행할 때도 이 폴더를 작업 폴더로 지정합니다. SDK DLL을 Sample마다 복사하지 않습니다.
+- 소스는 UTF-8 BOM으로 저장합니다. 화면은 Unicode WinAPI, 제품 API와 서버 원문은 MultiByte 경로를 사용합니다.
 
-개발서버 `api-dev.capefn.com:8080` 또는 운영서버 `api.capefn.com:8080`을 선택해 ID Login 후 오른쪽의 단축코드를 확인하고 **처음 조회**를 누릅니다. 운영 로그인 인증정보는 직접 입력합니다. 개발 기본값, 한글 UI, 비밀번호 가림·지우기는 기존 Helper를 사용합니다. 자동 조회는 없습니다.
+## 사용 순서
 
-## Header Type과 Request
+1. 접속정보를 확인하고 로그인합니다. Helper가 로그인 최종 통지와 세션 상태를 확인합니다.
+2. 단축코드를 입력한 뒤 처음 조회를 누릅니다. XML 초기값은 공백 8바이트입니다.
+3. 응답과 서버 메시지를 확인합니다. 로그인만으로 조회하지 않습니다.
+4. XML에 출력 커서를 다음 입력으로 전달하는 정의가 없으므로 처음 조회만 요청합니다.
+5. 창을 닫으면 진행 요청과 세션을 정리한 뒤 DLL을 해제합니다.
 
-A의 Header는 OrdaAPI 내부에서 구성됩니다. t1001과 같은 공개 `RequestData` API를 사용하지만 출력은 단일 레코드가 아니라 반복 블록입니다. Header Type이 같아도 응답 길이와 반복 건수 계산을 t1001에서 그대로 가져오면 안 됩니다.
+조회 Sample은 기존 한 번의 로그인 시도 방식을 유지합니다. 로그인 실패 후 다시 시도하려면 프로그램을 재실행합니다.
 
-`t3084InBlock`은 `focode char[8] @0`와 속성 공간 1바이트로 구성된 **9바이트** 본문입니다. XML 기본값은 공백 8개이며 UI에서도 그대로 사용합니다. 입력값 의미와 결과 범위는 실제 서비스 안내 및 서버 결과로 확인하십시오.
+## 입력 항목
 
-## Response와 반복 건수
+| 입력 필드 | 설명 | 바이트 | UI / 초기값 |
+| --- | --- | ---: | --- |
+| `focode` | 단축코드 | 8 | Edit / 공백 8개 |
 
-`block=1`, `attr=1`인 `t3084OutBlock`을 확인한 후, 본문 길이가 53바이트의 배수인지 검사합니다. OrdaAPI가 wire Header와 블록명을 이미 분리했으므로 본문에 이를 다시 더하지 않습니다. **5자리 건수 접두부도 없습니다.**
+XML에 정의된 기본값만 적용합니다. ComboBox의 설명 대신 실제 코드값을 전송하며 고정 길이 필드는 공백으로 채우고 종료 NUL을 전송하지 않습니다. Edit 입력 제한과 전송 전 바이트 길이 검사를 유지합니다.
 
-```text
-레코드 수 = nDataLength / 53
-각 레코드 = shcode[8] + 속성 1 + expcode[12] + 속성 1 + hname[30] + 속성 1
+## 코드 읽는 순서와 API
+
+- `WinMain` → `Common::Initialize`: 공통 Helper의 Load/Initialize를 호출합니다.
+- `WindowProc` → `Common::HandleMessage`: 로그인 버튼의 Connect/Login과 최종 로그인 통지를 처리합니다.
+- `RequestService`: 입력 전문을 구성하고 `Common::Api()->RequestData`를 직접 호출합니다.
+- `ReceiveService`: 응답의 요청 ID·서비스·블록·길이를 검증하고 실제 구조체 멤버를 표시합니다.
+- `WM_CLOSE`: 진행 요청 해제 → Helper Cleanup의 Logout/Disconnect/DLL 해제 → 창 파괴 순서입니다.
+
+```cpp
+Common::Api()->RequestData(window, SERVICE_CODE, &input, sizeof(input), NULL);
 ```
 
-| Field | Type | Length | Offset |
-| --- | --- | --- | --- |
-| shcode | char | 8 | 0 |
-| expcode | char | 12 | 9 |
-| hname | char | 30 | 22 |
+반환값 0~255는 요청 ID이며 최종 조회 성공이 아닙니다. 한 번에 한 요청만 처리하며 RELEASE_DATA까지 다음 요청을 막습니다. RequestData 반환 전 재진입 통지는 ID가 정해진 뒤 원래 순서로 처리합니다.
 
-전체 건수와 최대 200행을 표시합니다. 길이가 맞지 않거나 다른 블록이면 결과로 해석하지 않습니다. 빈 반복 블록은 0행으로 처리합니다.
+## 응답과 메모리
 
-응답은 사용자 제공 `t3084OutBlock` 구조체로 처리합니다. XML과 일치하는 크기·alignment·세 필드의 offset/길이/속성 위치를 컴파일 시 검사합니다. 음수 길이·불완전 레코드·양수 길이의 NULL 본문을 먼저 거부한 뒤 `nDataLength / sizeof(t3084OutBlock)`으로 건수를 구합니다. 각 표시 레코드를 지역 구조체에 `memcpy`하고 `output.shcode`, `output.expcode`, `output.hname`을 실제 배열 길이로 읽습니다. Header나 블록명은 구조체에 포함하지 않으며 DLL 소유 포인터를 보관하지 않습니다. 기존 공백/NUL 처리·표시 순서·200행 제한을 유지합니다.
+A형 `t3084OutBlock`은 속성 바이트를 포함한 53바이트 반복 레코드입니다. 블록명과 전체 길이의 배수를 검증하고 구조체 단위로 접근합니다. lpData에는 별도 건수 접두부가 없습니다. 반복 결과는 최대 200행까지 표시합니다.
 
-## 연속조회 및 Memory
+`WM_RECEIVE_DATA`에서 REQUEST_DATA, MESSAGE_DATA, SYSTEM_ERROR_DATA, RELEASE_DATA를 구분합니다. 응답과 lpData는 OrdaAPI 소유이므로 직접 해제하지 않습니다. 서버 메시지는 표시 후 ReleaseMessageData로, 요청 데이터는 RELEASE_DATA·타임아웃·종료 시 ReleaseRequestData로 정리합니다. 길이 검증 없이 전문을 문자열로 출력하거나 DLL 소유 포인터를 보관하지 않습니다.
 
-XML에 명시적인 출력 cursor→입력 cursor 계약이 없으므로 `shcode`를 `focode`의 다음 키로 임의 대입하지 않습니다. 이 Sample은 최초 요청만 수행합니다. 연속 신호가 있더라도 키 매핑이 확인되지 않았다는 메시지를 표시하며 자동 추가 조회를 하지 않습니다.
-
-Query 본문 작성, 공개 API 호출, 응답 메시지, 반복 레코드 파싱은 모두 `main.cpp`에서 확인할 수 있습니다. REQUEST_DATA를 복사해 표시하고 제품 메모리를 임의 해제하지 않습니다. MSG_PACKET은 `ReleaseMessageData`, 요청은 RELEASE_DATA/timeout에서 `ReleaseRequestData`를 사용합니다. 요청 ID 0 및 호출 중 메시지 재진입도 처리합니다.
-
-빌드·오프라인 검증과 남은 서버 검증 항목은 [완료 보고서](../../../../../docs/query-header-type-samples-report.md)를 참고하십시오.
-
-Response 구조체 전환 후 42개 정상 조합(0/1/3/200/201/1000건 × 7개 데이터 패턴)과 19개 예외/메타데이터 사례를 기존 파서와 비교했습니다. 원본 필드 바이트·문자열·표시 함수에 전달되는 결과와 오류 처리가 일치했고, Debug/Release Win32 Clean→Build와 Runtime Load/Initialize 검사가 통과했습니다. 실제 서버 Login/Query와 GUI 렌더링 검증은 실행하지 않았습니다. 상세 결과는 [t3084 Response 전환 보고서](../../../../../docs/t3084-struct-response-report.md)에 기록했습니다.
+실제 서버 테스트는 이번 가독성 정리에서 수행하지 않았습니다.

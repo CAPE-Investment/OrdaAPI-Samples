@@ -1,55 +1,56 @@
-# b8024 종목별 신용한도 조회 — Header Type B
+﻿# b8024 — 종목별 신용한도 조회
 
-[XML 정의](../../../../../sdk/bin/sys/b8024.xml)에 대응하는 B 대표 Sample입니다. 신용한도 조회이며 주문 요청을 전송하지 않습니다. 실제 서버 Login/Query는 자동 실행하지 않았습니다.
+[main.cpp](OrdaAPI-b8024-CreditLimit/main.cpp)에서 입력 구성, 요청 API, 응답 처리와 종료 순서를 확인할 수 있습니다.
 
-## 개발 환경 및 실행
+## 빌드와 실행
 
-VS2010 / v100 / Win32 / MultiByte / WinAPI이며 MFC와 C++11은 사용하지 않습니다. `OrdaAPI-b8024-CreditLimit.sln`을 열어 Debug 또는 Release Win32로 빌드합니다. 기존 t1001과 동일한 [공통 접속/Login Helper](../../common/README.md)를 Source로 직접 컴파일합니다. 별도 Helper DLL/Library는 없습니다.
+- Visual Studio 2010 / v100 / Win32 / MultiByte / C++03 / 순수 WinAPI입니다.
+- `OrdaAPI-b8024-CreditLimit.sln`을 열고 Debug 또는 Release / Win32로 빌드합니다.
+- SDK Header는 `sdk/include`, 전문 구조체는 `sdk/structs/cpp`를 참조합니다. `ORDAAPI_INCLUDE_DIR` 재정의를 지원합니다.
+- 디버거 작업 폴더는 저장소의 `sdk/bin`입니다. IDE 밖에서 실행할 때도 이 폴더를 작업 폴더로 지정합니다. SDK DLL을 Sample마다 복사하지 않습니다.
+- 소스는 UTF-8 BOM으로 저장합니다. 화면은 Unicode WinAPI, 제품 API와 서버 원문은 MultiByte 경로를 사용합니다.
 
-공통 Header는 `sdk/include`, Runtime과 Debugging Working Directory는 `sdk/bin`입니다. 상대경로 설정을 유지하며 IDE 밖에서도 작업 폴더를 `sdk/bin`으로 지정하십시오. 실행 파일은 이 Sample의 `bin/Debug` 또는 `bin/Release`에 생성됩니다. 자체 한글 UI는 Unicode WinAPI, 제품 원문은 ANSI를 사용합니다.
+## 사용 순서
 
-개발서버 `api-dev.capefn.com:8080` 또는 운영서버 `api.capefn.com:8080`을 선택해 ID Login을 완료한 뒤, 오른쪽의 XML 입력값을 채워 **처음 조회**를 누릅니다. 운영 인증정보는 직접 입력하며 개발 기본값·비밀번호 가림 정책은 기존 Helper와 같습니다. 조회값의 업무상 허용 코드는 정식 서비스 안내에 따라 입력하십시오. XML에 없는 기본값이나 코드 의미를 만들어 넣지 않았습니다.
+1. 접속정보를 확인하고 로그인합니다. Helper가 로그인 최종 통지와 세션 상태를 확인합니다.
+2. 종목·계좌 등 조회 조건을 입력하고 두 코드 항목을 선택한 뒤 처음 조회를 누릅니다.
+3. 응답과 서버 메시지를 확인합니다. 로그인만으로 조회하지 않습니다.
+4. 다음 조회에는 실제 응답의 Header.szContKey만 전달합니다. 조회 조건이 달라졌으면 처음 조회부터 다시 요청합니다.
+5. 창을 닫으면 진행 요청과 세션을 정리한 뒤 DLL을 해제합니다.
 
-## Header Type 특징과 Request
+조회 Sample은 기존 한 번의 로그인 시도 방식을 유지합니다. 로그인 실패 후 다시 시도하려면 프로그램을 재실행합니다.
 
-B는 제품 Source의 PowerBase/BASE21 Header에 대응합니다. Header 구성·서비스 정보 조회는 OrdaAPI 내부에서 수행하므로 고객이 통신 Header를 직접 붙이지 않습니다. 공개 API는 t1001과 동일한 `RequestData`입니다. 동일 B 서비스라도 각 XML의 블록·필드·반복 여부는 별도 확인해야 합니다.
+## 입력 항목
 
-`main.cpp`의 `INPUT_FIELDS`, `BuildInput`, `RequestService`에서 아래 본문을 공백으로 초기화하고 직접 구성합니다. `attr` 속성이 없어 필드 사이 속성 바이트가 없습니다. NUL은 전송하지 않습니다.
+| 입력 필드 | 설명 | 바이트 | UI / 초기값 |
+| --- | --- | ---: | --- |
+| `reccnt` | 레코드갯수 | 5 | Edit / `00001` |
+| `lmtclasscd` | 한도분류코드 | 2 | ComboBox: `A4` 융자, `A5` 대주 / 기본값 없음 (최초 미선택) |
+| `expcode` | 종목번호 | 12 | Edit / 기본값 없음 |
+| `AcntNo` | 계좌번호 | 20 | Edit / 기본값 없음 |
+| `jolmtgb` | 종목한도구분 | 1 | Edit / `1` |
+| `lmtvaluegb` | 한도값구분 | 1 | ComboBox: `1` 융자, `2` 대주 / 기본값 없음 (최초 미선택) |
 
-| b8024InBlock Field | Type | Length | Offset |
-| --- | --- | --- | --- |
-| reccnt | char | 5 | 0 |
-| lmtclasscd | char | 2 | 5 |
-| expcode | char | 12 | 7 |
-| AcntNo | char | 20 | 19 |
-| jolmtgb | char | 1 | 39 |
-| lmtvaluegb | char | 1 | 40 |
+XML에 정의된 기본값만 적용합니다. ComboBox의 설명 대신 실제 코드값을 전송하며 고정 길이 필드는 공백으로 채우고 종료 NUL을 전송하지 않습니다. Edit 입력 제한과 전송 전 바이트 길이 검사를 유지합니다.
 
-전체 입력은 **41바이트**입니다. `reccnt`와 응답 반복부 앞의 건수는 서로 다른 위치의 값입니다.
+## 코드 읽는 순서와 API
 
-## Response와 반복 Block
+- `WinMain` → `Common::Initialize`: 공통 Helper의 Load/Initialize를 호출합니다.
+- `WindowProc` → `Common::HandleMessage`: 로그인 버튼의 Connect/Login과 최종 로그인 통지를 처리합니다.
+- `RequestService`: 입력 전문을 구성하고 `Common::Api()->RequestData`를 직접 호출합니다.
+- `ReceiveService`: 응답의 요청 ID·서비스·블록·길이를 검증하고 실제 구조체 멤버를 표시합니다.
+- `WM_CLOSE`: 진행 요청 해제 → Helper Cleanup의 Logout/Disconnect/DLL 해제 → 창 파괴 순서입니다.
 
-`ParseService`는 다음 non-block 본문을 명시적으로 처리합니다.
-
-```text
-b8024OutBlock 41바이트
-반복 건수 5바이트 ASCII
-b8024OutBlock1 399바이트 × N
-전체 길이 = 46 + 399 × N
+```cpp
+Common::Api()->RequestData(window, SERVICE_CODE, &input, sizeof(input), next ? nextKey : NULL);
 ```
 
-건수·레코드 폭·전체 길이를 모두 검증합니다. 화면에는 전체 건수와 최대 200행의 `lmtclassnm`, `hname`, `lmtgbnm`, `lmtval`, `loanjanval`, `useablelmtamt`를 표시합니다. 전체 출력 정의는 XML에서 확인하십시오. 입력 Echo 블록의 `reccnt`를 반복 건수로 대신 사용하지 않습니다.
+반환값 0~255는 요청 ID이며 최종 조회 성공이 아닙니다. 한 번에 한 요청만 처리하며 RELEASE_DATA까지 다음 요청을 막습니다. RequestData 반환 전 재진입 통지는 ID가 정해진 뒤 원래 순서로 처리합니다.
 
-최신 사용자 헤더의 `b8024OutBlock`(고정 경계 41바이트)과 `b8024OutBlock1`(반복 399바이트)을 사용합니다. 두 구조체의 모든 필드 offset/길이와 크기·alignment를 컴파일 검사하고, 검증된 각 표시 레코드를 지역 `b8024OutBlock1`에 memcpy해 이름 있는 멤버를 읽습니다. 고정 Echo 필드는 기존처럼 추가 표시하지 않습니다. Request 구조체, B 연속 플래그/실제 Header key 및 메모리 해제 처리는 유지했습니다. 정상·연속조회 조합 57개와 예외/메타데이터 24개가 기존 결과와 일치했고 Debug/Release 빌드가 통과했습니다. 자세한 내용은 [B/C/D Response 보고서](../../../../../docs/query-bcd-struct-response-report.md)를 참고하십시오.
+## 응답과 메모리
 
-## 연속조회
+B형 본문은 고정 `b8024OutBlock` 41바이트 + ASCII 건수 5바이트 + `b8024OutBlock1` 399바이트 × N입니다. 고정 블록의 reccnt를 반복 건수로 사용하지 않습니다. 반복 결과는 최대 200행까지 표시합니다.
 
-B의 응답 `Header.szPNFlag=='Y'`와 실제로 수신한 비어 있지 않은 `Header.szContKey`가 모두 있을 때, 요청 해제가 완료된 후 **다음 조회**를 활성화합니다. 키의 공백을 보존해 `RequestData` 마지막 인수에 전달합니다. 검색 조건을 바꾸면 처음 조회부터 다시 시작해야 합니다. 화면에는 한 페이지씩 표시하며 자동 다음 조회는 하지 않습니다.
+`WM_RECEIVE_DATA`에서 REQUEST_DATA, MESSAGE_DATA, SYSTEM_ERROR_DATA, RELEASE_DATA를 구분합니다. 응답과 lpData는 OrdaAPI 소유이므로 직접 해제하지 않습니다. 서버 메시지는 표시 후 ReleaseMessageData로, 요청 데이터는 RELEASE_DATA·타임아웃·종료 시 ReleaseRequestData로 정리합니다. 길이 검증 없이 전문을 문자열로 출력하거나 DLL 소유 포인터를 보관하지 않습니다.
 
-제품 Source에는 응답 키가 공개 패킷에 전달되지 않는 경로가 있습니다. 플래그만 있거나 키가 없으면 추측하지 않고 다음 조회를 비활성화합니다. 이 Sample에서 키가 항상 내려온다고 보장하지 않으며, 실제 페이지 전환은 사용자 서버 검증 대상입니다.
-
-## 메시지와 메모리
-
-`main.cpp`에서 REQUEST_DATA·MESSAGE_DATA·SYSTEM_ERROR_DATA·RELEASE_DATA 및 timeout을 처리합니다. 요청 ID 0도 유효합니다. 코드·본문 길이·블록 형태를 확인하고 제품 소유 버퍼를 즉시 복사합니다. 메시지는 `ReleaseMessageData`, 요청은 RELEASE_DATA/timeout에서 `ReleaseRequestData`로 정리하며 `delete/free`하지 않습니다. 오류·연결 해제·진행 중에는 추가 요청을 막습니다. 서버 메시지는 원문으로 표시합니다.
-
-Debug/Release 빌드와 오프라인 계약 검증 결과, 실제 서버에서 확인할 내용은 [완료 보고서](../../../../../docs/query-header-type-samples-report.md)에 있습니다.
+실제 서버 테스트는 이번 가독성 정리에서 수행하지 않았습니다.

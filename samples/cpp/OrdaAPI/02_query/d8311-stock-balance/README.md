@@ -1,59 +1,55 @@
-# d8311 주식잔고 조회 — Header Type D
+﻿# d8311 — 주식잔고
 
-[XML 정의](../../../../../sdk/bin/sys/d8311.xml)에 대응하는 D 대표 Sample입니다. 속성 바이트가 있는 입력, 연속 종목번호 블록, 반복 잔고 블록과 조건부 수동 다음 조회를 보여줍니다. 실제 서버 Login/Query는 자동 수행하지 않았습니다.
+[main.cpp](OrdaAPI-d8311-StockBalance/main.cpp)에서 입력 구성, 요청 API, 응답 처리와 종료 순서를 확인할 수 있습니다.
 
-## 개발 환경 및 실행
+## 빌드와 실행
 
-VS2010 / v100 / Win32 / MultiByte / WinAPI이며 MFC와 C++11은 사용하지 않습니다. `OrdaAPI-d8311-StockBalance.sln`을 열어 Debug/Release Win32로 빌드합니다. [공통 ID Login Helper](../../common/README.md)는 Source로 직접 컴파일합니다. 공통 Header·Runtime은 `sdk/include`, `sdk/bin`이며 Debugging Working Directory와 IDE 밖의 작업 폴더도 `sdk/bin`입니다. 실행 파일은 Sample의 `bin/Debug`, `bin/Release`에 생성됩니다.
+- Visual Studio 2010 / v100 / Win32 / MultiByte / C++03 / 순수 WinAPI입니다.
+- `OrdaAPI-d8311-StockBalance.sln`을 열고 Debug 또는 Release / Win32로 빌드합니다.
+- SDK Header는 `sdk/include`, 전문 구조체는 `sdk/structs/cpp`를 참조합니다. `ORDAAPI_INCLUDE_DIR` 재정의를 지원합니다.
+- 디버거 작업 폴더는 저장소의 `sdk/bin`입니다. IDE 밖에서 실행할 때도 이 폴더를 작업 폴더로 지정합니다. SDK DLL을 Sample마다 복사하지 않습니다.
+- 소스는 UTF-8 BOM으로 저장합니다. 화면은 Unicode WinAPI, 제품 API와 서버 원문은 MultiByte 경로를 사용합니다.
 
-개발서버 `api-dev.capefn.com:8080` 또는 운영서버 `api.capefn.com:8080`을 선택해 로그인한 뒤 오른쪽 계좌 입력을 채웁니다. 운영 로그인 정보와 조회 계좌 정보는 직접 입력합니다. **계좌 비밀번호는 Login 비밀번호와 다른 XML 입력값**입니다. 비밀번호는 가려 표시하고 각 조회 후 지우므로 다음 조회 때 다시 입력하십시오.
+## 사용 순서
 
-## Header Type과 Request
+1. 접속정보를 확인하고 로그인합니다. Helper가 로그인 최종 통지와 세션 상태를 확인합니다.
+2. 계좌와 비밀번호·종목번호·거래소를 입력하고 처음 조회를 누릅니다. CTS 입력은 읽기 전용입니다.
+3. 응답과 서버 메시지를 확인합니다. 로그인만으로 조회하지 않습니다.
+4. 다음 조회에는 수신 cts_expcode와 Header.szContKey가 모두 필요합니다. 화면 기본값을 다시 적용하지 않아 커서를 보존하며 조회 조건이 달라졌으면 처음 조회부터 다시 요청합니다.
+5. 창을 닫으면 진행 요청과 세션을 정리한 뒤 DLL을 해제합니다.
 
-D는 제품 Source의 TUXIDO & PowerBase Header입니다. 제품이 Header를 구성하므로 Sample에서 wire Header를 추가하지 않습니다. 공개 API는 기존 `RequestData`이며 서비스 본문과 연속 키만 인수로 전달합니다. 동일 D 서비스도 필드 폭·attr·반복 구조가 다르므로 이 offset을 다른 서비스에 복사하면 안 됩니다.
+조회 Sample은 기존 한 번의 로그인 시도 방식을 유지합니다. 로그인 실패 후 다시 시도하려면 프로그램을 재실행합니다.
 
-`d8311InBlock`은 `attr=1`이며 각 필드 뒤에 속성 공간 1바이트를 포함해 **49바이트**입니다.
+## 입력 항목
 
-| Field | Type | Length | Offset | UI 처리 |
-| --- | --- | --- | --- | --- |
-| accno | char | 11 | 0 | 계좌번호 직접 입력 |
-| passwd | char | 8 | 12 | 비밀번호 가림, 요청 후 지움 |
-| expcode | char | 12 | 21 | 종목번호 직접 입력 |
-| cts_expcode | char | 12 | 34 | 처음은 XML 기본 공백, 다음은 응답값; 읽기 전용 표시 |
-| exchange | char | 1 | 47 | XML 기본값 3; 1=KRX, 2=NXT, 3=통합 |
+| 입력 필드 | 설명 | 바이트 | UI / 초기값 |
+| --- | --- | ---: | --- |
+| `accno` | 계좌번호 | 11 | Edit / 기본값 없음 |
+| `passwd` | 비밀번호 | 8 | 비밀번호 Edit / 기본값 없음 |
+| `expcode` | 종목번호 | 12 | Edit / 공백 12개 |
+| `cts_expcode` | CTS_종목번호 | 12 | 읽기 전용 Edit / 공백 12개 |
+| `exchange` | 거래소구분 | 1 | ComboBox: `1` KRX, `2` NXT, `3` 통합 / `3` |
 
-속성 공간은 공백으로 초기화하고 NUL을 추가 전송하지 않습니다. 계좌·종목 값의 업무상 허용 범위는 정식 안내에 따라 입력하십시오. 처음 조회는 항상 빈 CTS를 사용합니다.
+XML에 정의된 기본값만 적용합니다. ComboBox의 설명 대신 실제 코드값을 전송하며 고정 길이 필드는 공백으로 채우고 종료 NUL을 전송하지 않습니다. Edit 입력 제한과 전송 전 바이트 길이 검사를 유지합니다.
 
-## Response와 반복 Block
+## 코드 읽는 순서와 API
 
-`main.cpp`에서 다음 non-block 본문을 검증합니다.
+- `WinMain` → `Common::Initialize`: 공통 Helper의 Load/Initialize를 호출합니다.
+- `WindowProc` → `Common::HandleMessage`: 로그인 버튼의 Connect/Login과 최종 로그인 통지를 처리합니다.
+- `RequestService`: 입력 전문을 구성하고 `Common::Api()->RequestData`를 직접 호출합니다.
+- `ReceiveService`: 응답의 요청 ID·서비스·블록·길이를 검증하고 실제 구조체 멤버를 표시합니다.
+- `WM_CLOSE`: 진행 요청 해제 → Helper Cleanup의 Logout/Disconnect/DLL 해제 → 창 파괴 순서입니다.
 
-```text
-d8311OutBlock: cts_expcode[12] + 속성 공간 = 13바이트
-반복 건수: 5바이트 ASCII
-d8311OutBlock1: 속성 공간 포함 150바이트 × N
-전체 길이 = 18 + 150 × N
+```cpp
+Common::Api()->RequestData(window, SERVICE_CODE, &input, sizeof(input), next ? nextKey : NULL);
 ```
 
-화면에는 연속 종목번호, 전체 건수와 최대 200행의 `expcode`, `janqty`, `mdposqt`, `pamt`, `price`, `sunikrt`를 표시합니다. 건수·레코드 폭·정확한 전체 길이를 검증하고 각 필드를 복사합니다. 전체 10개 반복 필드 정의는 XML에서 확인하십시오.
+반환값 0~255는 요청 ID이며 최종 조회 성공이 아닙니다. 한 번에 한 요청만 처리하며 RELEASE_DATA까지 다음 요청을 막습니다. RequestData 반환 전 재진입 통지는 ID가 정해진 뒤 원래 순서로 처리합니다.
 
-최신 사용자 헤더의 `d8311OutBlock`(13바이트)과 `d8311OutBlock1`(150바이트)을 사용합니다. 모든 필드 offset/길이·속성 위치와 크기·alignment를 컴파일 검사합니다. 전체 길이·반복 건수 검증 후 고정 블록과 각 표시 레코드를 지역 구조체에 memcpy하고, `fixed.cts_expcode`와 반복 멤버에서 값을 읽습니다. 본문 커서 12바이트와 Header key 18바이트는 각각 보존합니다. 기존 Request와 연속조회 조건·UI·메모리 해제 처리는 유지했습니다. 정상·연속조회 조합 57개와 예외/메타데이터 24개가 기존 결과와 일치했고 Debug/Release 빌드가 통과했습니다. 자세한 내용은 [B/C/D Response 보고서](../../../../../docs/query-bcd-struct-response-report.md)를 참고하십시오.
+## 응답과 메모리
 
-## 연속조회
+D형 본문은 고정 `d8311OutBlock` 13바이트 + ASCII 건수 5바이트 + `d8311OutBlock1` 150바이트 × N입니다. 속성 바이트를 포함한 실제 구조체 길이로 검증합니다. 반복 결과는 최대 200행까지 표시합니다.
 
-다음 조건이 모두 충족될 때만 요청 해제 후 **다음 조회**를 활성화합니다.
+`WM_RECEIVE_DATA`에서 REQUEST_DATA, MESSAGE_DATA, SYSTEM_ERROR_DATA, RELEASE_DATA를 구분합니다. 응답과 lpData는 OrdaAPI 소유이므로 직접 해제하지 않습니다. 서버 메시지는 표시 후 ReleaseMessageData로, 요청 데이터는 RELEASE_DATA·타임아웃·종료 시 ReleaseRequestData로 정리합니다. 길이 검증 없이 전문을 문자열로 출력하거나 DLL 소유 포인터를 보관하지 않습니다.
 
-- D의 공개 응답 연속 플래그가 `Header.szPNFlag=='1'`.
-- 실제 수신한 `Header.szContKey`가 비어 있지 않음.
-- `d8311OutBlock.cts_expcode`가 비어 있지 않음.
-- 오류가 없고 검색 조건이 이전 페이지와 같음.
-
-다음 요청에서는 XML cursor를 입력 offset 34에 넣고 Header key는 공백을 보존해 `RequestData` 마지막 인수로 전달합니다. 두 값은 별개이며 서로 대체하지 않습니다. 계좌 비밀번호는 다시 입력하되 조건 비교용 저장 버퍼에는 보관하지 않습니다. 페이지는 수동으로 요청하며 현재 페이지를 표시합니다.
-
-제품 Source에는 공개 패킷에 연속 키가 복사되지 않는 경로도 있습니다. 그런 경우 빈 문자열 같은 대체 키를 만들어 요청하지 않고 다음 조회를 비활성화합니다. 실제 D 응답 플래그와 페이지 전환은 사용자 서버 확인이 필요합니다.
-
-## 메시지·메모리
-
-Query 요청·응답·반복 파싱은 모두 이 Sample의 `main.cpp`에 있습니다. 제품 소유 RP_DATA_INFO/lpData는 표시 전에 복사하고 `delete/free`하지 않습니다. MSG_PACKET은 복사 후 `ReleaseMessageData`, 요청은 RELEASE_DATA/timeout/종료에서 `ReleaseRequestData`로 정리합니다. 요청 ID 0, 호출 중 재진입, 조회 중 중복 요청·로그인 전 요청·접속 해제 후 요청을 처리합니다. 서버 메시지는 원문을 표시합니다.
-
-검증 결과와 남은 실제 서버 확인 항목은 [완료 보고서](../../../../../docs/query-header-type-samples-report.md)에 있습니다.
+실제 서버 테스트는 이번 가독성 정리에서 수행하지 않았습니다.

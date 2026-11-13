@@ -1,4 +1,7 @@
-﻿// Visual Studio 2010 / v100 / Win32 / MultiByte. UTF-8 BOM for Korean UI.
+﻿// 읽는 순서: WinMain 초기화 → WindowProc 로그인 통지 → 요청 함수 → 수신 함수 → 종료 처리.
+// Load/Initialize와 Connect/Login은 기존 Common Helper를 사용합니다.
+// 로그인 결과는 Common::HandleMessage가 처리하며 요청 API는 아래에서 직접 호출합니다.
+// Visual Studio 2010 / v100 / Win32 / MultiByte. 한글 소스는 UTF-8 BOM으로 저장합니다.
 #include "../../../common/OrdaSampleCommon.h"
 #include "t1001.h"
 #include <stddef.h>
@@ -9,12 +12,14 @@
 
 namespace Common = OrdaSampleCommon;
 
-// Keep the supplied packed layout identical to the existing XML request.
+// XML과 제공된 구조체의 패킹·크기·필드 위치가 일치하는지 확인합니다.
 static_assert(sizeof(t1001InBlock) == 9, "Request length differs from XML");
 static_assert(__alignof(t1001InBlock) == 1, "Request alignment differs from XML");
-static_assert(offsetof(t1001InBlock, shcode) == 0 && sizeof(((t1001InBlock*)0)->shcode) == 6, "shcode layout differs from XML");
+static_assert(offsetof(t1001InBlock, shcode) == 0 && sizeof(((t1001InBlock *)0)->shcode) == 6,
+              "shcode layout differs from XML");
 static_assert(offsetof(t1001InBlock, _shcode) == 6, "shcode attribute offset differs from XML");
-static_assert(offsetof(t1001InBlock, exchange) == 7 && sizeof(((t1001InBlock*)0)->exchange) == 1, "exchange layout differs from XML");
+static_assert(offsetof(t1001InBlock, exchange) == 7 && sizeof(((t1001InBlock *)0)->exchange) == 1,
+              "exchange layout differs from XML");
 static_assert(offsetof(t1001InBlock, _exchange) == 8, "exchange attribute offset differs from XML");
 
 const char T1001_CODE[] = "t1001";
@@ -22,20 +27,44 @@ const char T1001_OUTPUT_BLOCK[] = "t1001OutBlock";
 const int T1001_INPUT_SIZE = 9;
 const int T1001_OUTPUT_SIZE = 1184;
 
-// C++03-compatible checks for the displayed response fields.
+// C++03 형식으로 화면에 표시할 응답 필드의 크기와 위치를 검사합니다.
 typedef char CheckT1001OutputSize[(sizeof(t1001OutBlock) == T1001_OUTPUT_SIZE) ? 1 : -1];
 typedef char CheckT1001OutputAlignment[(__alignof(t1001OutBlock) == 1) ? 1 : -1];
-typedef char CheckOut_hname[(offsetof(t1001OutBlock, hname) == 0 && sizeof(((t1001OutBlock*)0)->hname) == 20 && offsetof(t1001OutBlock, _hname) == 20) ? 1 : -1];
-typedef char CheckOut_price[(offsetof(t1001OutBlock, price) == 21 && sizeof(((t1001OutBlock*)0)->price) == 8 && offsetof(t1001OutBlock, _price) == 29) ? 1 : -1];
-typedef char CheckOut_sign[(offsetof(t1001OutBlock, sign) == 30 && sizeof(((t1001OutBlock*)0)->sign) == 1 && offsetof(t1001OutBlock, _sign) == 31) ? 1 : -1];
-typedef char CheckOut_change[(offsetof(t1001OutBlock, change) == 32 && sizeof(((t1001OutBlock*)0)->change) == 8 && offsetof(t1001OutBlock, _change) == 40) ? 1 : -1];
-typedef char CheckOut_diff[(offsetof(t1001OutBlock, diff) == 41 && sizeof(((t1001OutBlock*)0)->diff) == 6 && offsetof(t1001OutBlock, _diff) == 47) ? 1 : -1];
-typedef char CheckOut_volume[(offsetof(t1001OutBlock, volume) == 48 && sizeof(((t1001OutBlock*)0)->volume) == 12 && offsetof(t1001OutBlock, _volume) == 60) ? 1 : -1];
+typedef char CheckOut_hname[(offsetof(t1001OutBlock, hname) == 0 &&
+                             sizeof(((t1001OutBlock *)0)->hname) == 20 &&
+                             offsetof(t1001OutBlock, _hname) == 20)
+                                ? 1
+                                : -1];
+typedef char CheckOut_price[(offsetof(t1001OutBlock, price) == 21 &&
+                             sizeof(((t1001OutBlock *)0)->price) == 8 &&
+                             offsetof(t1001OutBlock, _price) == 29)
+                                ? 1
+                                : -1];
+typedef char
+    CheckOut_sign[(offsetof(t1001OutBlock, sign) == 30 && sizeof(((t1001OutBlock *)0)->sign) == 1 &&
+                   offsetof(t1001OutBlock, _sign) == 31)
+                      ? 1
+                      : -1];
+typedef char CheckOut_change[(offsetof(t1001OutBlock, change) == 32 &&
+                              sizeof(((t1001OutBlock *)0)->change) == 8 &&
+                              offsetof(t1001OutBlock, _change) == 40)
+                                 ? 1
+                                 : -1];
+typedef char
+    CheckOut_diff[(offsetof(t1001OutBlock, diff) == 41 && sizeof(((t1001OutBlock *)0)->diff) == 6 &&
+                   offsetof(t1001OutBlock, _diff) == 47)
+                      ? 1
+                      : -1];
+typedef char CheckOut_volume[(offsetof(t1001OutBlock, volume) == 48 &&
+                              sizeof(((t1001OutBlock *)0)->volume) == 12 &&
+                              offsetof(t1001OutBlock, _volume) == 60)
+                                 ? 1
+                                 : -1];
 
 const int QUERY_BUTTON = 300;
 HWND g_symbol, g_exchange, g_queryButton, g_requestedSymbol;
 HWND g_name, g_price, g_sign, g_change, g_diff, g_volume;
-int g_requestId = -1; // 0 is a valid request ID; -1 means no outstanding request.
+int g_requestId = -1; // 요청 ID 0도 유효하며 -1은 진행 중인 요청이 없음을 뜻합니다.
 BOOL g_closing = FALSE;
 BOOL g_submitting = FALSE;
 BOOL g_receivedData = FALSE;
@@ -51,19 +80,19 @@ std::deque<DeferredNotification> g_deferred;
 
 void UpdateQueryButton()
 {
-    EnableWindow(g_queryButton, Common::IsReady() && !Common::IsBusy() &&
-        !g_closing && g_requestId < 0 && !g_submitting);
+    EnableWindow(g_queryButton,
+                 Common::IsReady() && !Common::IsBusy() && !g_closing && g_requestId < 0 &&
+                     !g_submitting);
 }
 
-// Fixed-width XML fields are not NUL-terminated. Copy into our own buffer,
-// trim padding, and never retain an OrdaAPI-owned pointer.
-BOOL CopyField(const void* data, int dataLength, int offset, int width,
-               char* output, int capacity)
+// 고정 길이 XML 필드는 NUL 종료를 보장하지 않으므로 길이를 지정해 복사합니다.
+// 패딩을 제거한 복사본만 사용하고 OrdaAPI 소유 포인터는 보관하지 않습니다.
+BOOL CopyField(const void *data, int dataLength, int offset, int width, char *output, int capacity)
 {
-    if (!data || !output || offset < 0 || width < 0 || dataLength < 0 ||
-        offset > dataLength || width > dataLength - offset || capacity <= width)
+    if (!data || !output || offset < 0 || width < 0 || dataLength < 0 || offset > dataLength ||
+        width > dataLength - offset || capacity <= width)
         return FALSE;
-    memcpy(output, (const char*)data + offset, width);
+    memcpy(output, (const char *)data + offset, width);
     output[width] = 0;
     int end = width;
     while (end > 0 && (output[end - 1] == ' ' || output[end - 1] == 0))
@@ -84,8 +113,10 @@ void ClearOutput()
 }
 
 // ------------------------------------------------------------
-// t1001 주식현재가 조회 요청: t1001InBlock -> 9-byte request -> Public API.
+// t1001 주식현재가 요청: 입력 구조체를 구성해 9바이트 본문을 공개 API로 전달합니다.
 // ------------------------------------------------------------
+
+// 조회 요청: 입력 확인 → 구조체 설정 → RequestData → 요청 ID 보관.
 void RequestT1001(HWND window)
 {
     if (!Common::IsReady())
@@ -97,7 +128,7 @@ void RequestT1001(HWND window)
         return;
     char symbol[32] = {0};
     GetWindowTextA(g_symbol, symbol, sizeof(symbol));
-    // shcode is a fixed six-byte short code; no guessed market-specific format.
+    // shcode는 6바이트 단축코드이며 시장별 형식을 임의로 추가하지 않습니다.
     if (strlen(symbol) != 6)
     {
         Common::SetResult(L"종목코드를 6자리로 입력하십시오.");
@@ -105,8 +136,7 @@ void RequestT1001(HWND window)
     }
     for (int i = 0; i < 6; ++i)
     {
-        if (!((symbol[i] >= '0' && symbol[i] <= '9') ||
-              (symbol[i] >= 'A' && symbol[i] <= 'Z') ||
+        if (!((symbol[i] >= '0' && symbol[i] <= '9') || (symbol[i] >= 'A' && symbol[i] <= 'Z') ||
               (symbol[i] >= 'a' && symbol[i] <= 'z')))
         {
             Common::SetResult(L"종목코드는 영문 또는 숫자 6자리로 입력하십시오.");
@@ -127,28 +157,31 @@ void RequestT1001(HWND window)
         UpdateQueryButton();
         return;
     }
-    // t1001.xml: attr="1". SDK ServiceIO::CreateMemory uses space padding.
-    // shcode: offset 0, char[6]; attribute byte: offset 6.
-    // exchange: offset 7, char[1]; attribute byte: offset 8.
-    // XML char fields and their attr bytes use spaces; no NUL is sent.
+    // t1001.xml은 attr=1이며 SDK ServiceIO::CreateMemory와 같은 공백 패딩을 사용합니다.
+    // shcode는 offset 0의 char[6]이며 offset 6은 속성 바이트입니다.
+    // exchange는 offset 7의 char[1]이며 offset 8은 속성 바이트입니다.
+    // 문자 필드와 속성 바이트는 공백으로 채우며 종료 NUL은 전송하지 않습니다.
     t1001InBlock input;
     memset(&input, ' ', sizeof(input));
     memcpy(input.shcode, symbol, sizeof(input.shcode));
-    input.exchange[0] = (char)('1' + exchange); // codes.xml EXCHANGE: 1 KRX, 2 NXT, 3 통합.
+    input.exchange[0] = (char)('1' + exchange); // codes.xml EXCHANGE 정의: 1=KRX, 2=NXT, 3=통합.
     memcpy(g_requestSymbol, symbol, 7);
     ClearOutput();
     g_receivedData = FALSE;
     g_queryError = FALSE;
     g_submitting = TRUE;
     UpdateQueryButton();
-    // No Query wrapper in the common helper. NULL means first request.
-    // Product code copies this stack buffer before RequestData returns.
+    // 조회 API를 공통 Helper에 숨기지 않습니다. NULL은 처음 조회를 뜻합니다.
+    // 제품은 RequestData가 반환하기 전에 지역 입력 버퍼를 내부에 복사합니다.
     int result = Common::Api()->RequestData(window, T1001_CODE, &input, sizeof(input), NULL);
     g_requestId = result >= 0 && result <= 255 ? result : -1;
     if (g_requestId >= 0)
     {
         wchar_t text[128];
-        swprintf_s(text, _countof(text), L"주식현재가 조회를 요청했습니다. 요청 ID: %d", g_requestId);
+        swprintf_s(text,
+                   _countof(text),
+                   L"주식현재가 조회를 요청했습니다. 요청 ID: %d",
+                   g_requestId);
         Common::SetResult(text);
     }
     else
@@ -159,18 +192,28 @@ void RequestT1001(HWND window)
 }
 
 // ------------------------------------------------------------
-// t1001 Response: validate the public packet, then copy its output block.
-// lpData is the block body; Header and szBlockName are separate API members.
+// t1001 응답: 공개 패킷을 검증한 뒤 출력 블록을 복사합니다.
+// lpData는 출력 본문이며 Header와 szBlockName은 공개 API의 별도 멤버입니다.
 // ------------------------------------------------------------
-void ReceiveT1001(const RP_DATA_INFO* response)
+
+// 조회 응답: 요청 ID·서비스·블록·길이를 검증하고 필요한 필드를 표시합니다.
+void ReceiveT1001(const RP_DATA_INFO *response)
 {
     if (!response || g_requestId < 0 || response->nRqID != g_requestId || g_closing)
         return;
     char code[7], block[18];
-    if (!CopyField(response->Header.szTrCode, sizeof(response->Header.szTrCode),
-                   0, sizeof(response->Header.szTrCode), code, sizeof(code)) ||
-        !CopyField(response->szBlockName, sizeof(response->szBlockName),
-                   0, sizeof(response->szBlockName), block, sizeof(block)) ||
+    if (!CopyField(response->Header.szTrCode,
+                   sizeof(response->Header.szTrCode),
+                   0,
+                   sizeof(response->Header.szTrCode),
+                   code,
+                   sizeof(code)) ||
+        !CopyField(response->szBlockName,
+                   sizeof(response->szBlockName),
+                   0,
+                   sizeof(response->szBlockName),
+                   block,
+                   sizeof(block)) ||
         strcmp(code, T1001_CODE) != 0 || strcmp(block, T1001_OUTPUT_BLOCK) != 0)
     {
         g_queryError = TRUE;
@@ -186,35 +229,48 @@ void ReceiveT1001(const RP_DATA_INFO* response)
     if (response->Header.szRetFlag[0] >= '1' && response->Header.szRetFlag[0] <= '9')
     {
         g_queryError = TRUE;
-        Common::SetResult(L"서버에서 조회 오류를 반환했습니다. 결과 코드와 원본 메시지를 확인하십시오.");
+        Common::SetResult(
+            L"서버에서 조회 오류를 반환했습니다. 결과 코드와 원본 메시지를 확인하십시오.");
         return;
     }
     char name[21], price[9], sign[2], change[9], diff[7], volume[13];
-    // Copy only the validated body. No DLL-owned pointer escapes this call.
+    // 검증한 본문만 복사하며 DLL 소유 포인터는 이 함수 밖으로 보관하지 않습니다.
     t1001OutBlock output;
     memcpy(&output, response->lpData, sizeof(output));
     CopyField(output.hname, sizeof(output.hname), 0, sizeof(output.hname), name, sizeof(name));
     CopyField(output.price, sizeof(output.price), 0, sizeof(output.price), price, sizeof(price));
     CopyField(output.sign, sizeof(output.sign), 0, sizeof(output.sign), sign, sizeof(sign));
-    CopyField(output.change, sizeof(output.change), 0, sizeof(output.change), change, sizeof(change));
+    CopyField(output.change,
+              sizeof(output.change),
+              0,
+              sizeof(output.change),
+              change,
+              sizeof(change));
     CopyField(output.diff, sizeof(output.diff), 0, sizeof(output.diff), diff, sizeof(diff));
-    CopyField(output.volume, sizeof(output.volume), 0, sizeof(output.volume), volume, sizeof(volume));
-    SetWindowTextA(g_requestedSymbol, g_requestSymbol); // Request context, NOT an Output field.
+    CopyField(output.volume,
+              sizeof(output.volume),
+              0,
+              sizeof(output.volume),
+              volume,
+              sizeof(volume));
+    SetWindowTextA(g_requestedSymbol,
+                   g_requestSymbol); // 보관한 요청 종목코드이며 출력 블록의 필드가 아닙니다.
     SetWindowTextA(g_name, name);
     SetWindowTextA(g_price, price);
-    SetWindowTextA(g_sign, sign); // XML has no enum mapping; show the original sign value.
+    SetWindowTextA(g_sign, sign); // XML에 선택값 정의가 없으므로 수신한 sign 원문을 표시합니다.
     SetWindowTextA(g_change, change);
     SetWindowTextA(g_diff, diff);
     SetWindowTextA(g_volume, volume);
     g_receivedData = TRUE;
     if (!g_queryError)
         Common::SetResult(L"주식현재가 조회 결과를 수신했습니다.");
-    // No delete/free: response and lpData belong to OrdaAPI until RELEASE_DATA.
+    // 응답과 lpData는 RELEASE_DATA까지 OrdaAPI 소유이므로 직접 delete/free하지 않습니다.
 }
 
+// 요청 통지: 데이터·서버 메시지·오류·해제를 구분하고 소유권에 맞춰 정리합니다.
 void HandleQueryNotification(UINT message, WPARAM wParam, LPARAM lParam)
 {
-    OrdaAPI* api = Common::Api();
+    OrdaAPI *api = Common::Api();
     if (!api)
         return;
     if (message == Common::API_MESSAGE_BASE + WM_TIMEOUT_DATA)
@@ -229,27 +285,32 @@ void HandleQueryNotification(UINT message, WPARAM wParam, LPARAM lParam)
         }
     }
     else if (wParam == REQUEST_DATA)
-        ReceiveT1001((const RP_DATA_INFO*)lParam);
+        ReceiveT1001((const RP_DATA_INFO *)lParam);
     else if (wParam == MESSAGE_DATA || wParam == SYSTEM_ERROR_DATA)
     {
-        const MSG_PACKET* packet = (const MSG_PACKET*)lParam;
+        const MSG_PACKET *packet = (const MSG_PACKET *)lParam;
         if (packet)
         {
             if (!g_closing && g_requestId >= 0 && packet->nRqID == g_requestId)
             {
                 char code[7] = {0}, text[2048] = {0};
-                CopyField(packet->szCode, sizeof(packet->szCode), 0,
-                          sizeof(packet->szCode), code, sizeof(code));
+                CopyField(packet->szCode,
+                          sizeof(packet->szCode),
+                          0,
+                          sizeof(packet->szCode),
+                          code,
+                          sizeof(code));
                 int length = packet->nMsgLength;
                 if (length > (int)sizeof(text) - 1)
                     length = sizeof(text) - 1;
                 if (length > 0 && packet->lpszMessageData)
                     memcpy(text, packet->lpszMessageData, length);
-                Common::SetServerResult(code, text); // Original server text; no translation.
+                Common::SetServerResult(code, text); // 번역하거나 변경하지 않은 서버 원문입니다.
                 if (wParam == SYSTEM_ERROR_DATA || packet->nIsSystemError)
                     g_queryError = TRUE;
             }
-            api->ReleaseMessageData(lParam); // Always release message packets, even unmatched ones.
+            api->ReleaseMessageData(
+                lParam); // 요청 ID가 일치하지 않아도 메시지 패킷은 반드시 해제합니다.
         }
     }
     else if (wParam == RELEASE_DATA)
@@ -276,20 +337,28 @@ void DrainDeferredNotifications()
     }
 }
 
-void AddOutput(HWND window, const wchar_t* label, int y, HWND* value)
+void AddOutput(HWND window, const wchar_t *label, int y, HWND *value)
 {
     Common::AddControl(window, L"STATIC", label, 0, 20, y, 150, 22, 0);
-    *value = Common::AddControl(window, L"EDIT", L"", ES_READONLY | ES_AUTOHSCROLL,
-                               180, y - 2, 350, 24, 0);
+    *value = Common::AddControl(window,
+                                L"EDIT",
+                                L"",
+                                ES_READONLY | ES_AUTOHSCROLL,
+                                180,
+                                y - 2,
+                                350,
+                                24,
+                                0);
 }
 
+// 메인 메시지 처리: API 통지와 사용자 입력을 분리하고 종료 수명을 보호합니다.
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {
     if (message == Common::API_MESSAGE_BASE + WM_RECEIVE_DATA ||
         message == Common::API_MESSAGE_BASE + WM_TIMEOUT_DATA)
     {
-        // The DLL posts data/release messages in order. If its RequestData call
-        // pumps messages before returning an ID, preserve that order until it returns.
+        // DLL은 데이터와 해제 메시지를 순서대로 게시합니다. RequestData 반환 전에
+        // 재진입하면 요청 ID를 받은 뒤 같은 순서로 처리하도록 통지를 보관합니다.
         if (g_submitting)
         {
             DeferredNotification item = {message, wParam, lParam};
@@ -310,18 +379,39 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         Common::CreateLoginControls(window);
         Common::AddControl(window, L"STATIC", L"주식현재가 조회 (t1001)", 0, 20, 495, 350, 22, 0);
         Common::AddControl(window, L"STATIC", L"종목코드", 0, 20, 527, 150, 22, 0);
-        g_symbol = Common::AddControl(window, L"EDIT", L"", ES_AUTOHSCROLL | WS_TABSTOP,
-                                     180, 525, 140, 24, 0);
+        g_symbol = Common::AddControl(window,
+                                      L"EDIT",
+                                      L"",
+                                      ES_AUTOHSCROLL | WS_TABSTOP,
+                                      180,
+                                      525,
+                                      140,
+                                      24,
+                                      0);
         SendMessage(g_symbol, EM_SETLIMITTEXT, 6, 0);
         Common::AddControl(window, L"STATIC", L"거래소구분", 0, 20, 557, 150, 22, 0);
-        g_exchange = Common::AddControl(window, L"COMBOBOX", L"", CBS_DROPDOWNLIST | WS_TABSTOP,
-                                       180, 555, 140, 120, 0);
+        g_exchange = Common::AddControl(window,
+                                        L"COMBOBOX",
+                                        L"",
+                                        CBS_DROPDOWNLIST | WS_TABSTOP,
+                                        180,
+                                        555,
+                                        140,
+                                        120,
+                                        0);
         SendMessageW(g_exchange, CB_ADDSTRING, 0, (LPARAM)L"KRX (1)");
         SendMessageW(g_exchange, CB_ADDSTRING, 0, (LPARAM)L"NXT (2)");
         SendMessageW(g_exchange, CB_ADDSTRING, 0, (LPARAM)L"통합 (3)");
-        SendMessage(g_exchange, CB_SETCURSEL, 2, 0); // XML default="3".
-        g_queryButton = Common::AddControl(window, L"BUTTON", L"조회", WS_TABSTOP,
-                                          420, 525, 110, 54, QUERY_BUTTON);
+        SendMessage(g_exchange, CB_SETCURSEL, 2, 0); // XML 기본값은 3입니다.
+        g_queryButton = Common::AddControl(window,
+                                           L"BUTTON",
+                                           L"조회",
+                                           WS_TABSTOP,
+                                           420,
+                                           525,
+                                           110,
+                                           54,
+                                           QUERY_BUTTON);
         EnableWindow(g_queryButton, FALSE);
         AddOutput(window, L"요청 종목코드", 597, &g_requestedSymbol);
         AddOutput(window, L"종목명 (hname)", 627, &g_name);
@@ -351,7 +441,8 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 Common::Api()->ReleaseRequestData(g_requestId);
                 g_requestId = -1;
             }
-            Common::Cleanup(); // Logout -> Disconnect -> FreeLibrary, before HWND destruction.
+            Common::
+                Cleanup(); // 윈도우를 파괴하기 전에 Logout → Disconnect → FreeLibrary 순서로 정리합니다.
             DestroyWindow(window);
         }
         return 0;
@@ -362,6 +453,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
     return DefWindowProcW(window, message, wParam, lParam);
 }
 
+// 시작과 종료: 화면 생성 → Common 초기화 → 메시지 루프 → 종료 처리.
 int APIENTRY WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int show)
 {
     WNDCLASSW wc = {0};
@@ -372,15 +464,23 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int show)
     wc.lpszClassName = L"OrdaAPIT1001Sample";
     if (!RegisterClassW(&wc))
         return 1;
-    HWND window = CreateWindowW(wc.lpszClassName, L"OrdaAPI 주식현재가 조회 예제 (t1001)",
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        CW_USEDEFAULT, CW_USEDEFAULT, 570, 855, NULL, NULL, instance, NULL);
+    HWND window = CreateWindowW(wc.lpszClassName,
+                                L"OrdaAPI 주식현재가 조회 예제 (t1001)",
+                                WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+                                CW_USEDEFAULT,
+                                CW_USEDEFAULT,
+                                570,
+                                855,
+                                NULL,
+                                NULL,
+                                instance,
+                                NULL);
     if (!window)
         return 1;
     ShowWindow(window, show);
     UpdateWindow(window);
     Common::BeginCall();
-    Common::Initialize(); // Current working directory stays at shared sdk/bin.
+    Common::Initialize(); // 공통 Runtime의 상대경로 접근을 위해 작업 폴더를 sdk/bin으로 유지합니다.
     Common::EndCall(window);
     UpdateQueryButton();
     MSG message;

@@ -1,4 +1,7 @@
-﻿// VS2010 v100 / Win32 / MultiByte. All Query logic stays in this file.
+﻿// 읽는 순서: WinMain 초기화 → WindowProc 로그인 통지 → 요청 함수 → 수신 함수 → 종료 처리.
+// Load/Initialize와 Connect/Login은 기존 Common Helper를 사용합니다.
+// 로그인 결과는 Common::HandleMessage가 처리하며 요청 API는 아래에서 직접 호출합니다.
+// VS2010 v100 / Win32 / MultiByte. 조회 요청과 응답 처리는 이 파일에서 확인합니다.
 #include "../../../common/OrdaSampleCommon.h"
 #include "b8024.h"
 #include <stddef.h>
@@ -10,320 +13,532 @@
 
 namespace Common = OrdaSampleCommon;
 
-// Keep the supplied packed layout identical to the existing XML request.
+// XML과 제공된 구조체의 패킹·크기·필드 위치가 일치하는지 확인합니다.
 static_assert(sizeof(b8024InBlock) == 41, "Request length differs from XML");
 static_assert(__alignof(b8024InBlock) == 1, "Request alignment differs from XML");
-static_assert(offsetof(b8024InBlock, reccnt) == 0 && sizeof(((b8024InBlock*)0)->reccnt) == 5, "reccnt layout differs from XML");
-static_assert(offsetof(b8024InBlock, lmtclasscd) == 5 && sizeof(((b8024InBlock*)0)->lmtclasscd) == 2, "lmtclasscd layout differs from XML");
-static_assert(offsetof(b8024InBlock, expcode) == 7 && sizeof(((b8024InBlock*)0)->expcode) == 12, "expcode layout differs from XML");
-static_assert(offsetof(b8024InBlock, AcntNo) == 19 && sizeof(((b8024InBlock*)0)->AcntNo) == 20, "AcntNo layout differs from XML");
-static_assert(offsetof(b8024InBlock, jolmtgb) == 39 && sizeof(((b8024InBlock*)0)->jolmtgb) == 1, "jolmtgb layout differs from XML");
-static_assert(offsetof(b8024InBlock, lmtvaluegb) == 40 && sizeof(((b8024InBlock*)0)->lmtvaluegb) == 1, "lmtvaluegb layout differs from XML");
+static_assert(offsetof(b8024InBlock, reccnt) == 0 && sizeof(((b8024InBlock *)0)->reccnt) == 5,
+              "reccnt layout differs from XML");
+static_assert(offsetof(b8024InBlock, lmtclasscd) == 5 &&
+                  sizeof(((b8024InBlock *)0)->lmtclasscd) == 2,
+              "lmtclasscd layout differs from XML");
+static_assert(offsetof(b8024InBlock, expcode) == 7 && sizeof(((b8024InBlock *)0)->expcode) == 12,
+              "expcode layout differs from XML");
+static_assert(offsetof(b8024InBlock, AcntNo) == 19 && sizeof(((b8024InBlock *)0)->AcntNo) == 20,
+              "AcntNo layout differs from XML");
+static_assert(offsetof(b8024InBlock, jolmtgb) == 39 && sizeof(((b8024InBlock *)0)->jolmtgb) == 1,
+              "jolmtgb layout differs from XML");
+static_assert(offsetof(b8024InBlock, lmtvaluegb) == 40 &&
+                  sizeof(((b8024InBlock *)0)->lmtvaluegb) == 1,
+              "lmtvaluegb layout differs from XML");
 
-// C++03-compatible checks for the supplied XML output layouts.
-typedef char Check_b8024OutBlock_reccnt[(offsetof(b8024OutBlock, reccnt) == 0 && sizeof(((b8024OutBlock*)0)->reccnt) == 5) ? 1 : -1];
-typedef char Check_b8024OutBlock_lmtclasscd[(offsetof(b8024OutBlock, lmtclasscd) == 5 && sizeof(((b8024OutBlock*)0)->lmtclasscd) == 2) ? 1 : -1];
-typedef char Check_b8024OutBlock_expcode[(offsetof(b8024OutBlock, expcode) == 7 && sizeof(((b8024OutBlock*)0)->expcode) == 12) ? 1 : -1];
-typedef char Check_b8024OutBlock_AcntNo[(offsetof(b8024OutBlock, AcntNo) == 19 && sizeof(((b8024OutBlock*)0)->AcntNo) == 20) ? 1 : -1];
-typedef char Check_b8024OutBlock_jolmtgb[(offsetof(b8024OutBlock, jolmtgb) == 39 && sizeof(((b8024OutBlock*)0)->jolmtgb) == 1) ? 1 : -1];
-typedef char Check_b8024OutBlock_lmtvaluegb[(offsetof(b8024OutBlock, lmtvaluegb) == 40 && sizeof(((b8024OutBlock*)0)->lmtvaluegb) == 1) ? 1 : -1];
-typedef char Check_b8024OutBlock_size[(sizeof(b8024OutBlock) == 41 && __alignof(b8024OutBlock) == 1) ? 1 : -1];
-typedef char Check_b8024OutBlock1_lmtclassnm[(offsetof(b8024OutBlock1, lmtclassnm) == 0 && sizeof(((b8024OutBlock1*)0)->lmtclassnm) == 40) ? 1 : -1];
-typedef char Check_b8024OutBlock1_hname[(offsetof(b8024OutBlock1, hname) == 40 && sizeof(((b8024OutBlock1*)0)->hname) == 40) ? 1 : -1];
-typedef char Check_b8024OutBlock1_lmtgbnm[(offsetof(b8024OutBlock1, lmtgbnm) == 80 && sizeof(((b8024OutBlock1*)0)->lmtgbnm) == 40) ? 1 : -1];
-typedef char Check_b8024OutBlock1_lmtvalgbnm[(offsetof(b8024OutBlock1, lmtvalgbnm) == 120 && sizeof(((b8024OutBlock1*)0)->lmtvalgbnm) == 40) ? 1 : -1];
-typedef char Check_b8024OutBlock1_lmtval[(offsetof(b8024OutBlock1, lmtval) == 160 && sizeof(((b8024OutBlock1*)0)->lmtval) == 18) ? 1 : -1];
-typedef char Check_b8024OutBlock1_loanjanval[(offsetof(b8024OutBlock1, loanjanval) == 178 && sizeof(((b8024OutBlock1*)0)->loanjanval) == 18) ? 1 : -1];
-typedef char Check_b8024OutBlock1_newordval[(offsetof(b8024OutBlock1, newordval) == 196 && sizeof(((b8024OutBlock1*)0)->newordval) == 18) ? 1 : -1];
-typedef char Check_b8024OutBlock1_newcheval[(offsetof(b8024OutBlock1, newcheval) == 214 && sizeof(((b8024OutBlock1*)0)->newcheval) == 18) ? 1 : -1];
-typedef char Check_b8024OutBlock1_sincheval[(offsetof(b8024OutBlock1, sincheval) == 232 && sizeof(((b8024OutBlock1*)0)->sincheval) == 18) ? 1 : -1];
-typedef char Check_b8024OutBlock1_loandamt[(offsetof(b8024OutBlock1, loandamt) == 250 && sizeof(((b8024OutBlock1*)0)->loandamt) == 16) ? 1 : -1];
-typedef char Check_b8024OutBlock1_useablelmtamt[(offsetof(b8024OutBlock1, useablelmtamt) == 266 && sizeof(((b8024OutBlock1*)0)->useablelmtamt) == 16) ? 1 : -1];
-typedef char Check_b8024OutBlock1_lmtclasscode[(offsetof(b8024OutBlock1, lmtclasscode) == 282 && sizeof(((b8024OutBlock1*)0)->lmtclasscode) == 2) ? 1 : -1];
-typedef char Check_b8024OutBlock1_expcode[(offsetof(b8024OutBlock1, expcode) == 284 && sizeof(((b8024OutBlock1*)0)->expcode) == 12) ? 1 : -1];
-typedef char Check_b8024OutBlock1_jolmtclass[(offsetof(b8024OutBlock1, jolmtclass) == 296 && sizeof(((b8024OutBlock1*)0)->jolmtclass) == 1) ? 1 : -1];
-typedef char Check_b8024OutBlock1_lmtvalgb[(offsetof(b8024OutBlock1, lmtvalgb) == 297 && sizeof(((b8024OutBlock1*)0)->lmtvalgb) == 1) ? 1 : -1];
-typedef char Check_b8024OutBlock1_jogrplmtclass[(offsetof(b8024OutBlock1, jogrplmtclass) == 298 && sizeof(((b8024OutBlock1*)0)->jogrplmtclass) == 1) ? 1 : -1];
-typedef char Check_b8024OutBlock1_gbnm1[(offsetof(b8024OutBlock1, gbnm1) == 299 && sizeof(((b8024OutBlock1*)0)->gbnm1) == 40) ? 1 : -1];
-typedef char Check_b8024OutBlock1_jogrp[(offsetof(b8024OutBlock1, jogrp) == 339 && sizeof(((b8024OutBlock1*)0)->jogrp) == 2) ? 1 : -1];
-typedef char Check_b8024OutBlock1_jogrpnm[(offsetof(b8024OutBlock1, jogrpnm) == 341 && sizeof(((b8024OutBlock1*)0)->jogrpnm) == 40) ? 1 : -1];
-typedef char Check_b8024OutBlock1_zLoanInfoGrdCode[(offsetof(b8024OutBlock1, zLoanInfoGrdCode) == 381 && sizeof(((b8024OutBlock1*)0)->zLoanInfoGrdCode) == 2) ? 1 : -1];
-typedef char Check_b8024OutBlock1_lLstdQty[(offsetof(b8024OutBlock1, lLstdQty) == 383 && sizeof(((b8024OutBlock1*)0)->lLstdQty) == 16) ? 1 : -1];
-typedef char Check_b8024OutBlock1_size[(sizeof(b8024OutBlock1) == 399 && __alignof(b8024OutBlock1) == 1) ? 1 : -1];
+// C++03 형식으로 출력 구조체의 크기와 필드 위치를 검사합니다.
+typedef char Check_b8024OutBlock_reccnt
+    [(offsetof(b8024OutBlock, reccnt) == 0 && sizeof(((b8024OutBlock *)0)->reccnt) == 5) ? 1 : -1];
+typedef char Check_b8024OutBlock_lmtclasscd[(offsetof(b8024OutBlock, lmtclasscd) == 5 &&
+                                             sizeof(((b8024OutBlock *)0)->lmtclasscd) == 2)
+                                                ? 1
+                                                : -1];
+typedef char Check_b8024OutBlock_expcode[(offsetof(b8024OutBlock, expcode) == 7 &&
+                                          sizeof(((b8024OutBlock *)0)->expcode) == 12)
+                                             ? 1
+                                             : -1];
+typedef char Check_b8024OutBlock_AcntNo[(offsetof(b8024OutBlock, AcntNo) == 19 &&
+                                         sizeof(((b8024OutBlock *)0)->AcntNo) == 20)
+                                            ? 1
+                                            : -1];
+typedef char Check_b8024OutBlock_jolmtgb[(offsetof(b8024OutBlock, jolmtgb) == 39 &&
+                                          sizeof(((b8024OutBlock *)0)->jolmtgb) == 1)
+                                             ? 1
+                                             : -1];
+typedef char Check_b8024OutBlock_lmtvaluegb[(offsetof(b8024OutBlock, lmtvaluegb) == 40 &&
+                                             sizeof(((b8024OutBlock *)0)->lmtvaluegb) == 1)
+                                                ? 1
+                                                : -1];
+typedef char Check_b8024OutBlock_size[(sizeof(b8024OutBlock) == 41 && __alignof(b8024OutBlock) == 1)
+                                          ? 1
+                                          : -1];
+typedef char Check_b8024OutBlock1_lmtclassnm[(offsetof(b8024OutBlock1, lmtclassnm) == 0 &&
+                                              sizeof(((b8024OutBlock1 *)0)->lmtclassnm) == 40)
+                                                 ? 1
+                                                 : -1];
+typedef char Check_b8024OutBlock1_hname[(offsetof(b8024OutBlock1, hname) == 40 &&
+                                         sizeof(((b8024OutBlock1 *)0)->hname) == 40)
+                                            ? 1
+                                            : -1];
+typedef char Check_b8024OutBlock1_lmtgbnm[(offsetof(b8024OutBlock1, lmtgbnm) == 80 &&
+                                           sizeof(((b8024OutBlock1 *)0)->lmtgbnm) == 40)
+                                              ? 1
+                                              : -1];
+typedef char Check_b8024OutBlock1_lmtvalgbnm[(offsetof(b8024OutBlock1, lmtvalgbnm) == 120 &&
+                                              sizeof(((b8024OutBlock1 *)0)->lmtvalgbnm) == 40)
+                                                 ? 1
+                                                 : -1];
+typedef char Check_b8024OutBlock1_lmtval[(offsetof(b8024OutBlock1, lmtval) == 160 &&
+                                          sizeof(((b8024OutBlock1 *)0)->lmtval) == 18)
+                                             ? 1
+                                             : -1];
+typedef char Check_b8024OutBlock1_loanjanval[(offsetof(b8024OutBlock1, loanjanval) == 178 &&
+                                              sizeof(((b8024OutBlock1 *)0)->loanjanval) == 18)
+                                                 ? 1
+                                                 : -1];
+typedef char Check_b8024OutBlock1_newordval[(offsetof(b8024OutBlock1, newordval) == 196 &&
+                                             sizeof(((b8024OutBlock1 *)0)->newordval) == 18)
+                                                ? 1
+                                                : -1];
+typedef char Check_b8024OutBlock1_newcheval[(offsetof(b8024OutBlock1, newcheval) == 214 &&
+                                             sizeof(((b8024OutBlock1 *)0)->newcheval) == 18)
+                                                ? 1
+                                                : -1];
+typedef char Check_b8024OutBlock1_sincheval[(offsetof(b8024OutBlock1, sincheval) == 232 &&
+                                             sizeof(((b8024OutBlock1 *)0)->sincheval) == 18)
+                                                ? 1
+                                                : -1];
+typedef char Check_b8024OutBlock1_loandamt[(offsetof(b8024OutBlock1, loandamt) == 250 &&
+                                            sizeof(((b8024OutBlock1 *)0)->loandamt) == 16)
+                                               ? 1
+                                               : -1];
+typedef char Check_b8024OutBlock1_useablelmtamt[(offsetof(b8024OutBlock1, useablelmtamt) == 266 &&
+                                                 sizeof(((b8024OutBlock1 *)0)->useablelmtamt) == 16)
+                                                    ? 1
+                                                    : -1];
+typedef char Check_b8024OutBlock1_lmtclasscode[(offsetof(b8024OutBlock1, lmtclasscode) == 282 &&
+                                                sizeof(((b8024OutBlock1 *)0)->lmtclasscode) == 2)
+                                                   ? 1
+                                                   : -1];
+typedef char Check_b8024OutBlock1_expcode[(offsetof(b8024OutBlock1, expcode) == 284 &&
+                                           sizeof(((b8024OutBlock1 *)0)->expcode) == 12)
+                                              ? 1
+                                              : -1];
+typedef char Check_b8024OutBlock1_jolmtclass[(offsetof(b8024OutBlock1, jolmtclass) == 296 &&
+                                              sizeof(((b8024OutBlock1 *)0)->jolmtclass) == 1)
+                                                 ? 1
+                                                 : -1];
+typedef char Check_b8024OutBlock1_lmtvalgb[(offsetof(b8024OutBlock1, lmtvalgb) == 297 &&
+                                            sizeof(((b8024OutBlock1 *)0)->lmtvalgb) == 1)
+                                               ? 1
+                                               : -1];
+typedef char Check_b8024OutBlock1_jogrplmtclass[(offsetof(b8024OutBlock1, jogrplmtclass) == 298 &&
+                                                 sizeof(((b8024OutBlock1 *)0)->jogrplmtclass) == 1)
+                                                    ? 1
+                                                    : -1];
+typedef char Check_b8024OutBlock1_gbnm1[(offsetof(b8024OutBlock1, gbnm1) == 299 &&
+                                         sizeof(((b8024OutBlock1 *)0)->gbnm1) == 40)
+                                            ? 1
+                                            : -1];
+typedef char Check_b8024OutBlock1_jogrp[(offsetof(b8024OutBlock1, jogrp) == 339 &&
+                                         sizeof(((b8024OutBlock1 *)0)->jogrp) == 2)
+                                            ? 1
+                                            : -1];
+typedef char Check_b8024OutBlock1_jogrpnm[(offsetof(b8024OutBlock1, jogrpnm) == 341 &&
+                                           sizeof(((b8024OutBlock1 *)0)->jogrpnm) == 40)
+                                              ? 1
+                                              : -1];
+typedef char
+    Check_b8024OutBlock1_zLoanInfoGrdCode[(offsetof(b8024OutBlock1, zLoanInfoGrdCode) == 381 &&
+                                           sizeof(((b8024OutBlock1 *)0)->zLoanInfoGrdCode) == 2)
+                                              ? 1
+                                              : -1];
+typedef char Check_b8024OutBlock1_lLstdQty[(offsetof(b8024OutBlock1, lLstdQty) == 383 &&
+                                            sizeof(((b8024OutBlock1 *)0)->lLstdQty) == 16)
+                                               ? 1
+                                               : -1];
+typedef char Check_b8024OutBlock1_size
+    [(sizeof(b8024OutBlock1) == 399 && __alignof(b8024OutBlock1) == 1) ? 1 : -1];
 
 const char SERVICE_CODE[] = "b8024";
 const wchar_t WINDOW_TITLE[] = L"OrdaAPI 종목별 신용한도 조회 (b8024 / B)";
 const int INPUT_SIZE = 41;
 const BOOL ALLOW_CONTINUATION = TRUE;
-const char CONTINUATION_FLAG = 'Y'; // B: BASE21_DATA_HEADER.szCont, not A's '1'.
-const int CURSOR_INDEX = -1; // B uses Header.szContKey; no XML cursor in this service.
+const char CONTINUATION_FLAG =
+    'Y'; // B형 연속조회 값은 BASE21_DATA_HEADER.szCont의 Y이며 A형의 1과 다릅니다.
+const int CURSOR_INDEX = -1; // B형은 Header.szContKey를 사용하며 이 서비스에는 XML 커서가 없습니다.
+struct InputChoice
+{
+    const wchar_t *label;
+    const char *code;
+};
+const InputChoice LIMIT_CLASSES[] = {{L"융자 (A4)", "A4"}, {L"대주 (A5)", "A5"}};
+const InputChoice LIMIT_VALUES[] = {{L"융자 (1)", "1"}, {L"대주 (2)", "2"}};
 struct InputField
 {
-    const wchar_t* label;
+    const wchar_t *label;
     int offset, width;
-    const char* defaultValue;
+    const char *defaultValue;
     BOOL password;
+    const InputChoice *choices;
+    int choiceCount;
 };
-// b8024InBlock: no attr bytes. No invented code-list defaults.
+// b8024 입력에는 속성 바이트가 없으며 선택값 기본값을 임의로 만들지 않습니다.
 const InputField INPUT_FIELDS[] = {
-    {L"레코드갯수 (reccnt)", 0, 5, "", FALSE},
-    {L"한도분류코드 (lmtclasscd)", 5, 2, "", FALSE},
+    {L"레코드갯수 (reccnt)", 0, 5, "00001", FALSE},
+    {L"한도분류코드 (lmtclasscd)", 5, 2, "", FALSE, LIMIT_CLASSES, _countof(LIMIT_CLASSES)},
     {L"종목번호 (expcode)", 7, 12, "", FALSE},
     {L"계좌번호 (AcntNo)", 19, 20, "", FALSE},
-    {L"종목한도구분 (jolmtgb)", 39, 1, "", FALSE},
-    {L"한도값구분 (lmtvaluegb)", 40, 1, "", FALSE}
-};
+    {L"종목한도구분 (jolmtgb)", 39, 1, "1", FALSE},
+    {L"한도값구분 (lmtvaluegb)", 40, 1, "", FALSE, LIMIT_VALUES, _countof(LIMIT_VALUES)}};
 HWND g_inputs[_countof(INPUT_FIELDS)], g_queryButton, g_nextButton, g_output;
 int g_requestId = -1;
 BOOL g_closing = FALSE, g_submitting = FALSE, g_received = FALSE, g_error = FALSE;
 BOOL g_hasNext = FALSE, g_baseValid = FALSE;
-char g_nextKey[19] = {0}; // Own copy; preserve fixed-width spaces in the 18-byte key.
+char g_nextKey[19] = {0}; // 수신 키를 복사해 보관하며 18바이트 고정 길이의 공백도 유지합니다.
 char g_cursor[13] = {0};
-char g_baseInput[INPUT_SIZE] = {0}; // Password bytes are replaced with spaces.
-struct Notification { UINT message; WPARAM wParam; LPARAM lParam; };
+char g_baseInput[INPUT_SIZE] = {0}; // 조회 조건을 보관할 때 비밀번호 부분은 공백으로 지웁니다.
+struct Notification
+{
+    UINT message;
+    WPARAM wParam;
+    LPARAM lParam;
+};
 std::deque<Notification> g_deferred;
 
-std::string Field(const void* data, int length, int offset, int width)
+std::string Field(const void *data, int length, int offset, int width)
 {
-    if (!data || offset < 0 || width < 0 || length < 0 || offset > length || width > length-offset)
+    if (!data || offset < 0 || width < 0 || length < 0 || offset > length ||
+        width > length - offset)
         return std::string();
-    std::string value((const char*)data+offset, width);
-    while (!value.empty() && (value[value.size()-1]==' ' || value[value.size()-1]==0))
-        value.erase(value.size()-1);
-    size_t first=value.find_first_not_of(' ');
-    return first==std::string::npos ? std::string() : value.substr(first);
+    std::string value((const char *)data + offset, width);
+    while (!value.empty() && (value[value.size() - 1] == ' ' || value[value.size() - 1] == 0))
+        value.erase(value.size() - 1);
+    size_t first = value.find_first_not_of(' ');
+    return first == std::string::npos ? std::string() : value.substr(first);
 }
 
-// Non-block occurs prefix: exactly five ASCII columns, then N fixed-width records.
-// Leading/trailing spaces are accepted, but signs, missing digits and junk are not.
-BOOL RecordCount(const unsigned char* data, int length, int position, int width, int& count)
+// 비블록 반복 구간은 ASCII 건수 5바이트 뒤에 고정 길이 레코드가 이어집니다.
+// 건수의 앞뒤 공백은 허용하되 부호·숫자 누락·그 외 문자는 거부합니다.
+BOOL RecordCount(const unsigned char *data, int length, int position, int width, int &count)
 {
-    if (!data || position<0 || position>length || length-position<5 || width<=0)
+    if (!data || position < 0 || position > length || length - position < 5 || width <= 0)
         return FALSE;
-    count=0;
-    BOOL digit=FALSE, ended=FALSE;
-    for (int i=0; i<5; ++i)
+    count = 0;
+    BOOL digit = FALSE, ended = FALSE;
+    for (int i = 0; i < 5; ++i)
     {
-        unsigned char c=data[position+i];
-        if (c==' ')
+        unsigned char c = data[position + i];
+        if (c == ' ')
         {
-            if (digit) ended=TRUE;
+            if (digit)
+                ended = TRUE;
         }
-        else if (c>='0' && c<='9' && !ended)
+        else if (c >= '0' && c <= '9' && !ended)
         {
-            digit=TRUE;
-            count=count*10+c-'0';
+            digit = TRUE;
+            count = count * 10 + c - '0';
         }
-        else return FALSE;
+        else
+            return FALSE;
     }
-    return digit && count <= (length-position-5)/width;
+    return digit && count <= (length - position - 5) / width;
 }
 
-std::string Ansi(const wchar_t* value)
+std::string Ansi(const wchar_t *value)
 {
-    int length=WideCharToMultiByte(CP_ACP,0,value,-1,NULL,0,NULL,NULL);
-    if (length<=0) return std::string();
-    std::string result(length,0);
-    WideCharToMultiByte(CP_ACP,0,value,-1,&result[0],length,NULL,NULL);
-    result.erase(result.size()-1);
+    int length = WideCharToMultiByte(CP_ACP, 0, value, -1, NULL, 0, NULL, NULL);
+    if (length <= 0)
+        return std::string();
+    std::string result(length, 0);
+    WideCharToMultiByte(CP_ACP, 0, value, -1, &result[0], length, NULL, NULL);
+    result.erase(result.size() - 1);
     return result;
 }
-std::string Rows(const unsigned char* records, int count)
+std::string Rows(const unsigned char *records, int count)
 {
     wchar_t heading[128];
     swprintf_s(heading, _countof(heading), L"레코드 수: %d (최대 200행 표시)\r\n", count);
-    std::string text=Ansi(heading);
-    int shown=count<200 ? count : 200;
-    for (int row=0; row<shown; ++row)
+    std::string text = Ansi(heading);
+    int shown = count < 200 ? count : 200;
+    for (int row = 0; row < shown; ++row)
     {
-        char number[32]; sprintf_s(number, "[%d] ", row+1); text+=number;
-        // ParseService validated the complete fixed/record boundary.
+        char number[32];
+        sprintf_s(number, "[%d] ", row + 1);
+        text += number;
+        // ParseService에서 고정 블록과 반복 레코드의 전체 경계를 검사한 상태입니다.
         b8024OutBlock1 output;
-        memcpy(&output,records+row*sizeof(output),sizeof(output));
-        text+="lmtclassnm=";
-        text+=Field(output.lmtclassnm,sizeof(output.lmtclassnm),0,sizeof(output.lmtclassnm));
-        text+=" | hname=";
-        text+=Field(output.hname,sizeof(output.hname),0,sizeof(output.hname));
-        text+=" | lmtgbnm=";
-        text+=Field(output.lmtgbnm,sizeof(output.lmtgbnm),0,sizeof(output.lmtgbnm));
-        text+=" | lmtval=";
-        text+=Field(output.lmtval,sizeof(output.lmtval),0,sizeof(output.lmtval));
-        text+=" | loanjanval=";
-        text+=Field(output.loanjanval,sizeof(output.loanjanval),0,sizeof(output.loanjanval));
-        text+=" | useablelmtamt=";
-        text+=Field(output.useablelmtamt,sizeof(output.useablelmtamt),0,sizeof(output.useablelmtamt));
-        text+="\r\n";
+        memcpy(&output, records + row * sizeof(output), sizeof(output));
+        text += "lmtclassnm=";
+        text += Field(output.lmtclassnm, sizeof(output.lmtclassnm), 0, sizeof(output.lmtclassnm));
+        text += " | hname=";
+        text += Field(output.hname, sizeof(output.hname), 0, sizeof(output.hname));
+        text += " | lmtgbnm=";
+        text += Field(output.lmtgbnm, sizeof(output.lmtgbnm), 0, sizeof(output.lmtgbnm));
+        text += " | lmtval=";
+        text += Field(output.lmtval, sizeof(output.lmtval), 0, sizeof(output.lmtval));
+        text += " | loanjanval=";
+        text += Field(output.loanjanval, sizeof(output.loanjanval), 0, sizeof(output.loanjanval));
+        text += " | useablelmtamt=";
+        text += Field(output.useablelmtamt,
+                      sizeof(output.useablelmtamt),
+                      0,
+                      sizeof(output.useablelmtamt));
+        text += "\r\n";
     }
     return text;
 }
 
 // ------------------------------------------------------------
-// B: [b8024OutBlock:41] [ASCII count:5] [b8024OutBlock1:399 * N].
-// Echo block's reccnt is NOT used as the occurs-prefix record count.
-// No wire Header is added here: OrdaAPI constructs it from server TRINFO.
+// B형 본문: b8024OutBlock 41바이트 + ASCII 건수 5바이트 + b8024OutBlock1 399바이트 × N.
+// 응답에 포함된 reccnt와 반복 구간 앞의 건수는 서로 다른 필드입니다.
+// 통신 헤더는 OrdaAPI가 서버 TRINFO에 따라 만들므로 입력 본문에 추가하지 않습니다.
 // ------------------------------------------------------------
-BOOL ParseService(const RP_DATA_INFO* response, std::string& text)
+
+// 출력 배치: XML에 정의된 고정 블록·반복 건수·전체 길이를 검사합니다.
+BOOL ParseService(const RP_DATA_INFO *response, std::string &text)
 {
-    const unsigned char* data=response->lpData;
-    const int fixedSize=sizeof(b8024OutBlock);
-    const int recordSize=sizeof(b8024OutBlock1);
-    const int recordsOffset=fixedSize+5; // Non-block ASCII count prefix.
-    int count=0;
-    if (!RecordCount(data,response->nDataLength,fixedSize,recordSize,count) ||
-        response->nDataLength != recordsOffset+count*recordSize)
+    const unsigned char *data = response->lpData;
+    const int fixedSize = sizeof(b8024OutBlock);
+    const int recordSize = sizeof(b8024OutBlock1);
+    const int recordsOffset = fixedSize + 5; // 비블록 반복 구간 앞의 ASCII 건수 길이입니다.
+    int count = 0;
+    if (!RecordCount(data, response->nDataLength, fixedSize, recordSize, count) ||
+        response->nDataLength != recordsOffset + count * recordSize)
         return FALSE;
-    // The fixed echo block is not displayed; its reccnt is not the prefix count.
-    text="b8024OutBlock1\r\n"+Rows(data+recordsOffset,count);
+    // 고정 응답 블록은 표시하지 않으며 reccnt를 반복 건수로 사용하지 않습니다.
+    text = "b8024OutBlock1\r\n" + Rows(data + recordsOffset, count);
     return TRUE;
 }
 
 void UpdateButtons()
 {
-    BOOL ready=Common::IsReady() && !Common::IsBusy() && !g_closing &&
-               !g_submitting && g_requestId<0;
-    EnableWindow(g_queryButton,ready);
-    if (g_nextButton) EnableWindow(g_nextButton,ready && g_hasNext && !g_error);
+    BOOL ready =
+        Common::IsReady() && !Common::IsBusy() && !g_closing && !g_submitting && g_requestId < 0;
+    EnableWindow(g_queryButton, ready);
+    if (g_nextButton)
+        EnableWindow(g_nextButton, ready && g_hasNext && !g_error);
 }
 
-BOOL BuildInput(b8024InBlock& input)
+// 입력 전문: 화면 값과 실제 코드값을 구조체 멤버에 설정합니다.
+BOOL BuildInput(b8024InBlock &input)
 {
-    // Map UI fields directly to the supplied service structure members.
-    char* fields[] = {input.reccnt, input.lmtclasscd, input.expcode, input.AcntNo, input.jolmtgb, input.lmtvaluegb};
-    for (int i=0; i<_countof(INPUT_FIELDS); ++i)
+    // 화면 입력을 제공된 서비스 구조체의 실제 멤버에 대응시킵니다.
+    char *fields[] = {input.reccnt,
+                      input.lmtclasscd,
+                      input.expcode,
+                      input.AcntNo,
+                      input.jolmtgb,
+                      input.lmtvaluegb};
+    for (int i = 0; i < _countof(INPUT_FIELDS); ++i)
     {
-        char value[128]={0};
-        int length=GetWindowTextA(g_inputs[i],value,sizeof(value));
-        if (length>INPUT_FIELDS[i].width)
+        char value[128] = {0};
+        int length = 0;
+        if (INPUT_FIELDS[i].choiceCount)
         {
-            SecureZeroMemory(value,sizeof(value));
+            int selected = (int)SendMessage(g_inputs[i], CB_GETCURSEL, 0, 0);
+            if (selected < 0 || selected >= INPUT_FIELDS[i].choiceCount)
+            {
+                Common::SetResult(L"?? ??? ?? ??? ??????.");
+                return FALSE;
+            }
+            // 화면 설명이 아닌 XML의 실제 코드값만 복사합니다.
+            const char *code = INPUT_FIELDS[i].choices[selected].code;
+            length = (int)strlen(code);
+            if (length < sizeof(value))
+                memcpy(value, code, length);
+        }
+        else
+            length = GetWindowTextA(g_inputs[i], value, sizeof(value));
+        if (length > INPUT_FIELDS[i].width)
+        {
+            SecureZeroMemory(value, sizeof(value));
             Common::SetResult(L"입력값의 바이트 길이가 XML 필드 길이를 초과했습니다.");
             return FALSE;
         }
-        memcpy(fields[i],value,length);
-        SecureZeroMemory(value,sizeof(value));
+        memcpy(fields[i], value, length);
+        SecureZeroMemory(value, sizeof(value));
     }
     return TRUE;
 }
 
-void RemovePasswords(char* input)
+void RemovePasswords(char *input)
 {
-    for (int i=0; i<_countof(INPUT_FIELDS); ++i)
+    for (int i = 0; i < _countof(INPUT_FIELDS); ++i)
         if (INPUT_FIELDS[i].password)
-            memset(input+INPUT_FIELDS[i].offset,' ',INPUT_FIELDS[i].width);
+            memset(input + INPUT_FIELDS[i].offset, ' ', INPUT_FIELDS[i].width);
 }
 
+// 조회 요청: 입력 설정과 연속조회 상태를 확인한 뒤 RequestData를 호출합니다.
 void RequestService(HWND window, BOOL next)
 {
-    if (!Common::IsReady()) { Common::SetResult(L"로그인이 필요합니다."); return; }
-    if (Common::IsBusy() || g_submitting || g_requestId>=0 || g_closing) return;
-    if (next && (!ALLOW_CONTINUATION || !g_hasNext || g_error)) return;
-    // XML char fields have no attr bytes; preserve space padding without NULs.
-    b8024InBlock input;
-    memset(&input,' ',sizeof(input));
-    if (!BuildInput(input)) { SecureZeroMemory(&input,sizeof(input)); return; }
-    char nonSecret[INPUT_SIZE]; memcpy(nonSecret,&input,sizeof(input)); RemovePasswords(nonSecret);
-    // Cursor is part of the page state, not a user-changed search condition.
-    if (CURSOR_INDEX>=0)
-        memset(nonSecret+INPUT_FIELDS[CURSOR_INDEX].offset,' ',INPUT_FIELDS[CURSOR_INDEX].width);
-    if (next && (!g_baseValid || memcmp(nonSecret,g_baseInput,INPUT_SIZE)))
+    if (!Common::IsReady())
     {
-        SecureZeroMemory(&input,sizeof(input));
+        Common::SetResult(L"로그인이 필요합니다.");
+        return;
+    }
+    if (Common::IsBusy() || g_submitting || g_requestId >= 0 || g_closing)
+        return;
+    if (next && (!ALLOW_CONTINUATION || !g_hasNext || g_error))
+        return;
+    // 속성 바이트가 없는 고정 길이 문자 필드이며 종료 NUL 없이 공백을 유지합니다.
+    b8024InBlock input;
+    memset(&input, ' ', sizeof(input));
+    if (!BuildInput(input))
+    {
+        SecureZeroMemory(&input, sizeof(input));
+        return;
+    }
+    char nonSecret[INPUT_SIZE];
+    memcpy(nonSecret, &input, sizeof(input));
+    RemovePasswords(nonSecret);
+    // 커서는 페이지 상태이므로 사용자가 변경한 조회 조건과 구분합니다.
+    if (CURSOR_INDEX >= 0)
+        memset(nonSecret + INPUT_FIELDS[CURSOR_INDEX].offset,
+               ' ',
+               INPUT_FIELDS[CURSOR_INDEX].width);
+    if (next && (!g_baseValid || memcmp(nonSecret, g_baseInput, INPUT_SIZE)))
+    {
+        SecureZeroMemory(&input, sizeof(input));
         Common::SetResult(L"조회 조건이 변경되었습니다. 처음 조회를 다시 실행하십시오.");
         return;
     }
-    memcpy(g_baseInput,nonSecret,sizeof(nonSecret)); g_baseValid=TRUE;
-    SecureZeroMemory(nonSecret,sizeof(nonSecret));
-    char nextKey[19]={0};
-    if (next) memcpy(nextKey,g_nextKey,sizeof(nextKey));
-    g_hasNext=FALSE; g_received=FALSE; g_error=FALSE;
-    if (!next) { memset(g_nextKey,0,sizeof(g_nextKey)); memset(g_cursor,0,sizeof(g_cursor)); }
-    SetWindowTextA(g_output,"");
+    memcpy(g_baseInput, nonSecret, sizeof(nonSecret));
+    g_baseValid = TRUE;
+    SecureZeroMemory(nonSecret, sizeof(nonSecret));
+    char nextKey[19] = {0};
+    if (next)
+        memcpy(nextKey, g_nextKey, sizeof(nextKey));
+    g_hasNext = FALSE;
+    g_received = FALSE;
+    g_error = FALSE;
+    if (!next)
+    {
+        memset(g_nextKey, 0, sizeof(g_nextKey));
+        memset(g_cursor, 0, sizeof(g_cursor));
+    }
+    SetWindowTextA(g_output, "");
     Common::BeginCall();
     if (!Common::CheckSession())
     {
-        SecureZeroMemory(&input,sizeof(input)); Common::EndCall(window);
+        SecureZeroMemory(&input, sizeof(input));
+        Common::EndCall(window);
         Common::SetResult(L"로그인이 필요합니다. 프로그램을 다시 실행하십시오.");
-        UpdateButtons(); return;
+        UpdateButtons();
+        return;
     }
-    g_submitting=TRUE; UpdateButtons();
-    // Actual Public API remains visible. For B, pass only the received cont-key.
-    int result=Common::Api()->RequestData(window,SERVICE_CODE,&input,sizeof(input),next ? nextKey : NULL);
-    SecureZeroMemory(&input,sizeof(input)); SecureZeroMemory(nextKey,sizeof(nextKey));
-    for (int i=0; i<_countof(INPUT_FIELDS); ++i)
-        if (INPUT_FIELDS[i].password) SetWindowTextA(g_inputs[i],"");
-    g_requestId=result>=0 && result<=255 ? result : -1;
-    g_submitting=FALSE;
-    if (g_requestId>=0) Common::SetResult(L"조회를 요청했습니다. 응답을 기다립니다.");
-    else { g_error=TRUE; Common::ShowCallResult(L"조회 요청 실패",result); }
-    Common::EndCall(window); UpdateButtons();
+    g_submitting = TRUE;
+    UpdateButtons();
+    // B형 요청에는 실제로 수신한 연속조회 키만 전달합니다.
+    int result = Common::Api()->RequestData(window,
+                                            SERVICE_CODE,
+                                            &input,
+                                            sizeof(input),
+                                            next ? nextKey : NULL);
+    SecureZeroMemory(&input, sizeof(input));
+    SecureZeroMemory(nextKey, sizeof(nextKey));
+    for (int i = 0; i < _countof(INPUT_FIELDS); ++i)
+        if (INPUT_FIELDS[i].password)
+            SetWindowTextA(g_inputs[i], "");
+    g_requestId = result >= 0 && result <= 255 ? result : -1;
+    g_submitting = FALSE;
+    if (g_requestId >= 0)
+        Common::SetResult(L"조회를 요청했습니다. 응답을 기다립니다.");
+    else
+    {
+        g_error = TRUE;
+        Common::ShowCallResult(L"조회 요청 실패", result);
+    }
+    Common::EndCall(window);
+    UpdateButtons();
 }
 
-void ReceiveService(const RP_DATA_INFO* response)
+// 조회 응답: 검증한 출력과 연속조회 키를 화면 및 다음 요청 상태에 반영합니다.
+void ReceiveService(const RP_DATA_INFO *response)
 {
-    if (g_closing || !response || g_requestId<0 || response->nRqID!=g_requestId) return;
-    if (Field(response->Header.szTrCode,sizeof(response->Header.szTrCode),0,6)!=SERVICE_CODE)
-    { g_error=TRUE; Common::SetResult(L"다른 서비스 코드의 응답입니다."); return; }
-    // XML has no block="1": B/C/D body contains all OUTBLOCKs in XML order.
-    // Product nDataMode differs between single-/multi-packet branches; it alone
-    // cannot determine this layout. Never cast the wire Header onto lpData.
-    if (!Field(response->szBlockName,sizeof(response->szBlockName),0,17).empty())
-    { g_error=TRUE; Common::SetResult(L"예상하지 않은 블록별 응답입니다."); return; }
+    if (g_closing || !response || g_requestId < 0 || response->nRqID != g_requestId)
+        return;
+    if (Field(response->Header.szTrCode, sizeof(response->Header.szTrCode), 0, 6) != SERVICE_CODE)
+    {
+        g_error = TRUE;
+        Common::SetResult(L"다른 서비스 코드의 응답입니다.");
+        return;
+    }
+    // XML에 block=1이 없으므로 B/C/D형 본문은 출력 블록이 XML 순서로 이어집니다.
+    // 제품의 단일·다중 패킷 경로에 따라 nDataMode가 달라질 수 있으므로
+    // 이 값만으로 배치를 판단하지 않으며 lpData를 통신 헤더로 해석하지 않습니다.
+    if (!Field(response->szBlockName, sizeof(response->szBlockName), 0, 17).empty())
+    {
+        g_error = TRUE;
+        Common::SetResult(L"예상하지 않은 블록별 응답입니다.");
+        return;
+    }
     std::string text;
-    if (!ParseService(response,text))
-    { g_error=TRUE; Common::SetResult(L"응답 길이 또는 반복 건수가 XML 구조와 맞지 않습니다."); return; }
-    SetWindowTextA(g_output,text.c_str()); g_received=TRUE;
-    // Only enable a real, manually requested continuation when the public packet
-    // actually supplied a key. Do not invent one if a product path omits it.
-    memcpy(g_nextKey,response->Header.szContKey,18); g_nextKey[18]=0;
-    g_hasNext=ALLOW_CONTINUATION && response->Header.szPNFlag[0]==CONTINUATION_FLAG &&
-              !Field(g_nextKey,18,0,18).empty();
-    if (CURSOR_INDEX>=0 && Field(g_cursor,12,0,12).empty()) g_hasNext=FALSE;
-    if (CURSOR_INDEX>=0) SetWindowTextA(g_inputs[CURSOR_INDEX],Field(g_cursor,12,0,12).c_str());
+    if (!ParseService(response, text))
+    {
+        g_error = TRUE;
+        Common::SetResult(L"응답 길이 또는 반복 건수가 XML 구조와 맞지 않습니다.");
+        return;
+    }
+    SetWindowTextA(g_output, text.c_str());
+    g_received = TRUE;
+    // 응답에 실제 연속조회 키가 있는 경우에만 수동 다음 조회를 허용합니다.
+    // 공개 패킷에 키가 없으면 임의로 생성하지 않습니다.
+    memcpy(g_nextKey, response->Header.szContKey, 18);
+    g_nextKey[18] = 0;
+    g_hasNext = ALLOW_CONTINUATION && response->Header.szPNFlag[0] == CONTINUATION_FLAG &&
+                !Field(g_nextKey, 18, 0, 18).empty();
+    if (CURSOR_INDEX >= 0 && Field(g_cursor, 12, 0, 12).empty())
+        g_hasNext = FALSE;
+    if (CURSOR_INDEX >= 0)
+        SetWindowTextA(g_inputs[CURSOR_INDEX], Field(g_cursor, 12, 0, 12).c_str());
     if (!g_error)
     {
-        if (response->Header.szPNFlag[0]==CONTINUATION_FLAG && !g_hasNext)
-            Common::SetResult(L"응답은 수신했으나 연속 조회에 필요한 키 또는 매핑이 없어 다음 조회를 활성화하지 않았습니다.");
+        if (response->Header.szPNFlag[0] == CONTINUATION_FLAG && !g_hasNext)
+            Common::SetResult(
+                L"응답은 수신했으나 연속 조회에 필요한 키 또는 매핑이 없어 다음 조회를 활성화하지 않았습니다.");
         else
             Common::SetResult(L"조회 결과를 수신했습니다. 반복 결과는 최대 200행까지 표시합니다.");
     }
 }
 
+// 요청 통지: 데이터·서버 메시지·오류·해제를 구분하고 소유권에 맞춰 정리합니다.
 void HandleNotification(UINT message, WPARAM kind, LPARAM parameter)
 {
-    OrdaAPI* api=Common::Api(); if (!api) return;
-    if (message==Common::API_MESSAGE_BASE+WM_TIMEOUT_DATA)
+    OrdaAPI *api = Common::Api();
+    if (!api)
+        return;
+    if (message == Common::API_MESSAGE_BASE + WM_TIMEOUT_DATA)
     {
-        if (g_requestId>=0 && (int)parameter==g_requestId)
+        if (g_requestId >= 0 && (int)parameter == g_requestId)
         {
-            api->ReleaseRequestData(g_requestId); g_requestId=-1; g_error=TRUE; g_hasNext=FALSE;
-            if (!g_closing) Common::SetResult(L"조회 응답 시간이 초과되었습니다.");
+            api->ReleaseRequestData(g_requestId);
+            g_requestId = -1;
+            g_error = TRUE;
+            g_hasNext = FALSE;
+            if (!g_closing)
+                Common::SetResult(L"조회 응답 시간이 초과되었습니다.");
         }
     }
-    else if (kind==REQUEST_DATA) ReceiveService((const RP_DATA_INFO*)parameter);
-    else if (kind==MESSAGE_DATA || kind==SYSTEM_ERROR_DATA)
+    else if (kind == REQUEST_DATA)
+        ReceiveService((const RP_DATA_INFO *)parameter);
+    else if (kind == MESSAGE_DATA || kind == SYSTEM_ERROR_DATA)
     {
-        const MSG_PACKET* packet=(const MSG_PACKET*)parameter;
+        const MSG_PACKET *packet = (const MSG_PACKET *)parameter;
         if (packet)
         {
-            if (!g_closing && g_requestId>=0 && packet->nRqID==g_requestId)
+            if (!g_closing && g_requestId >= 0 && packet->nRqID == g_requestId)
             {
-                std::string code=Field(packet->szCode,sizeof(packet->szCode),0,5);
-                int size=packet->nMsgLength;
-                if (size>2047) size=2047;
-                std::string text=size>0 && packet->lpszMessageData ?
-                    std::string((const char*)packet->lpszMessageData,size) : std::string();
-                Common::SetServerResult(code.c_str(),text.c_str());
-                if (kind==SYSTEM_ERROR_DATA || packet->nIsSystemError)
-                { g_error=TRUE; g_hasNext=FALSE; }
+                std::string code = Field(packet->szCode, sizeof(packet->szCode), 0, 5);
+                int size = packet->nMsgLength;
+                if (size > 2047)
+                    size = 2047;
+                std::string text = size > 0 && packet->lpszMessageData
+                                       ? std::string((const char *)packet->lpszMessageData, size)
+                                       : std::string();
+                Common::SetServerResult(code.c_str(), text.c_str());
+                if (kind == SYSTEM_ERROR_DATA || packet->nIsSystemError)
+                {
+                    g_error = TRUE;
+                    g_hasNext = FALSE;
+                }
             }
             api->ReleaseMessageData(parameter);
         }
     }
-    else if (kind==RELEASE_DATA && g_requestId>=0 && (int)parameter==g_requestId)
+    else if (kind == RELEASE_DATA && g_requestId >= 0 && (int)parameter == g_requestId)
     {
-        api->ReleaseRequestData(g_requestId); g_requestId=-1;
-        if (!g_received && !g_error && !g_closing) Common::SetResult(L"조회가 종료되었으나 데이터가 없습니다.");
-        if (g_error || !g_received) g_hasNext=FALSE;
+        api->ReleaseRequestData(g_requestId);
+        g_requestId = -1;
+        if (!g_received && !g_error && !g_closing)
+            Common::SetResult(L"조회가 종료되었으나 데이터가 없습니다.");
+        if (g_error || !g_received)
+            g_hasNext = FALSE;
     }
     UpdateButtons();
 }
@@ -332,83 +547,199 @@ void DrainNotifications()
 {
     while (!g_submitting && !g_deferred.empty())
     {
-        Notification item=g_deferred.front(); g_deferred.pop_front();
-        HandleNotification(item.message,item.wParam,item.lParam);
+        Notification item = g_deferred.front();
+        g_deferred.pop_front();
+        HandleNotification(item.message, item.wParam, item.lParam);
     }
 }
 
+// 메인 메시지 처리: API 통지와 사용자 입력을 분리하고 종료 수명을 보호합니다.
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    if (message==Common::API_MESSAGE_BASE+WM_RECEIVE_DATA || message==Common::API_MESSAGE_BASE+WM_TIMEOUT_DATA)
+    if (message == Common::API_MESSAGE_BASE + WM_RECEIVE_DATA ||
+        message == Common::API_MESSAGE_BASE + WM_TIMEOUT_DATA)
     {
-        if (g_submitting) { Notification item={message,wParam,lParam}; g_deferred.push_back(item); }
-        else HandleNotification(message,wParam,lParam);
+        if (g_submitting)
+        {
+            Notification item = {message, wParam, lParam};
+            g_deferred.push_back(item);
+        }
+        else
+            HandleNotification(message, wParam, lParam);
         return 0;
     }
-    if (Common::HandleMessage(window,message,wParam,lParam))
-    { UpdateButtons(); return 0; }
+    if (Common::HandleMessage(window, message, wParam, lParam))
+    {
+        UpdateButtons();
+        return 0;
+    }
     switch (message)
     {
     case WM_CREATE:
         Common::CreateLoginControls(window);
-        for (int i=0; i<_countof(INPUT_FIELDS); ++i)
+        for (int i = 0; i < _countof(INPUT_FIELDS); ++i)
         {
-            int y=25+i*30;
-            Common::AddControl(window,L"STATIC",INPUT_FIELDS[i].label,0,580,y,245,22,0);
-            g_inputs[i]=Common::AddControl(window,L"EDIT",L"",ES_AUTOHSCROLL | WS_TABSTOP |
-                (INPUT_FIELDS[i].password ? ES_PASSWORD : 0) | (i==CURSOR_INDEX ? ES_READONLY : 0),
-                830,y-2,260,24,0);
-            SendMessage(g_inputs[i],EM_SETLIMITTEXT,INPUT_FIELDS[i].width,0);
-            SetWindowTextA(g_inputs[i],INPUT_FIELDS[i].defaultValue);
+            int y = 25 + i * 30;
+            Common::AddControl(window, L"STATIC", INPUT_FIELDS[i].label, 0, 580, y, 245, 22, 0);
+            if (INPUT_FIELDS[i].choiceCount)
+            {
+                g_inputs[i] = Common::AddControl(window,
+                                                 L"COMBOBOX",
+                                                 L"",
+                                                 CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL,
+                                                 830,
+                                                 y - 2,
+                                                 260,
+                                                 150,
+                                                 0);
+                int initial = -1;
+                for (int j = 0; j < INPUT_FIELDS[i].choiceCount; ++j)
+                {
+                    SendMessageW(g_inputs[i],
+                                 CB_ADDSTRING,
+                                 0,
+                                 (LPARAM)INPUT_FIELDS[i].choices[j].label);
+                    if (strcmp(INPUT_FIELDS[i].defaultValue, INPUT_FIELDS[i].choices[j].code) == 0)
+                        initial = j;
+                }
+                SendMessage(g_inputs[i], CB_SETCURSEL, initial, 0);
+            }
+            else
+            {
+                g_inputs[i] = Common::AddControl(window,
+                                                 L"EDIT",
+                                                 L"",
+                                                 ES_AUTOHSCROLL | WS_TABSTOP |
+                                                     (INPUT_FIELDS[i].password ? ES_PASSWORD : 0) |
+                                                     (i == CURSOR_INDEX ? ES_READONLY : 0),
+                                                 830,
+                                                 y - 2,
+                                                 260,
+                                                 24,
+                                                 0);
+                SendMessage(g_inputs[i], EM_SETLIMITTEXT, INPUT_FIELDS[i].width, 0);
+                // XML 기본값은 컨트롤 생성 시에만 적용하여 수신한 연속조회 커서를 보존합니다.
+                SetWindowTextA(g_inputs[i], INPUT_FIELDS[i].defaultValue);
+            }
         }
         {
-            int y=30+_countof(INPUT_FIELDS)*30;
-            g_queryButton=Common::AddControl(window,L"BUTTON",L"처음 조회",WS_TABSTOP,830,y,120,28,300);
+            int y = 30 + _countof(INPUT_FIELDS) * 30;
+            g_queryButton = Common::AddControl(window,
+                                               L"BUTTON",
+                                               L"처음 조회",
+                                               WS_TABSTOP,
+                                               830,
+                                               y,
+                                               120,
+                                               28,
+                                               300);
             if (ALLOW_CONTINUATION)
-                g_nextButton=Common::AddControl(window,L"BUTTON",L"다음 조회",WS_TABSTOP,970,y,120,28,301);
-            Common::AddControl(window,L"STATIC",L"조회 결과 (전체 건수 / 최대 200행 표시)",0,580,y+38,510,22,0);
-            g_output=Common::AddControl(window,L"EDIT",L"",ES_READONLY | ES_MULTILINE | ES_AUTOVSCROLL |
-                ES_AUTOHSCROLL | WS_VSCROLL | WS_HSCROLL,580,y+62,510,300,0);
-            SendMessage(g_output,EM_SETLIMITTEXT,1024*1024,0);
+                g_nextButton = Common::AddControl(window,
+                                                  L"BUTTON",
+                                                  L"다음 조회",
+                                                  WS_TABSTOP,
+                                                  970,
+                                                  y,
+                                                  120,
+                                                  28,
+                                                  301);
+            Common::AddControl(window,
+                               L"STATIC",
+                               L"조회 결과 (전체 건수 / 최대 200행 표시)",
+                               0,
+                               580,
+                               y + 38,
+                               510,
+                               22,
+                               0);
+            g_output = Common::AddControl(window,
+                                          L"EDIT",
+                                          L"",
+                                          ES_READONLY | ES_MULTILINE | ES_AUTOVSCROLL |
+                                              ES_AUTOHSCROLL | WS_VSCROLL | WS_HSCROLL,
+                                          580,
+                                          y + 62,
+                                          510,
+                                          300,
+                                          0);
+            SendMessage(g_output, EM_SETLIMITTEXT, 1024 * 1024, 0);
         }
-        UpdateButtons(); return 0;
+        UpdateButtons();
+        return 0;
     case WM_COMMAND:
-        if ((LOWORD(wParam)==300 || LOWORD(wParam)==301) && HIWORD(wParam)==BN_CLICKED)
-        { RequestService(window,LOWORD(wParam)==301); DrainNotifications(); }
+        if ((LOWORD(wParam) == 300 || LOWORD(wParam) == 301) && HIWORD(wParam) == BN_CLICKED)
+        {
+            RequestService(window, LOWORD(wParam) == 301);
+            DrainNotifications();
+        }
         return 0;
     case WM_CLOSE:
-        if (!Common::BeginClose()) return 0;
+        if (!Common::BeginClose())
+            return 0;
         if (!g_closing)
         {
-            g_closing=TRUE; UpdateButtons(); DrainNotifications();
-            if (g_requestId>=0 && Common::Api())
-            { Common::Api()->ReleaseRequestData(g_requestId); g_requestId=-1; }
-            SecureZeroMemory(g_baseInput,sizeof(g_baseInput));
-            for (int i=0; i<_countof(INPUT_FIELDS); ++i)
-                if (INPUT_FIELDS[i].password) SetWindowTextA(g_inputs[i],"");
-            Common::Cleanup(); DestroyWindow(window);
+            g_closing = TRUE;
+            UpdateButtons();
+            DrainNotifications();
+            if (g_requestId >= 0 && Common::Api())
+            {
+                Common::Api()->ReleaseRequestData(g_requestId);
+                g_requestId = -1;
+            }
+            SecureZeroMemory(g_baseInput, sizeof(g_baseInput));
+            for (int i = 0; i < _countof(INPUT_FIELDS); ++i)
+                if (INPUT_FIELDS[i].password)
+                    SetWindowTextA(g_inputs[i], "");
+            Common::Cleanup();
+            DestroyWindow(window);
         }
         return 0;
-    case WM_DESTROY: PostQuitMessage(0); return 0;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
     }
-    return DefWindowProcW(window,message,wParam,lParam);
+    return DefWindowProcW(window, message, wParam, lParam);
 }
 
-int APIENTRY WinMain(HINSTANCE instance,HINSTANCE,LPSTR,int show)
+// 시작과 종료: 화면 생성 → Common 초기화 → 메시지 루프 → 종료 처리.
+int APIENTRY WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int show)
 {
-    WNDCLASSW wc={0}; wc.lpfnWndProc=WindowProc; wc.hInstance=instance;
-    wc.hCursor=LoadCursor(NULL,IDC_ARROW); wc.hbrBackground=(HBRUSH)(COLOR_BTNFACE+1);
-    wc.lpszClassName=L"OrdaQueryHeaderSample";
-    if (!RegisterClassW(&wc)) return 1;
-    HWND window=CreateWindowW(wc.lpszClassName,WINDOW_TITLE,
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        CW_USEDEFAULT,CW_USEDEFAULT,1140,650,NULL,NULL,instance,NULL);
-    if (!window) return 1;
-    ShowWindow(window,show); UpdateWindow(window);
-    Common::BeginCall(); Common::Initialize(); Common::EndCall(window); UpdateButtons();
-    MSG message; int status;
-    while ((status=GetMessageW(&message,NULL,0,0))>0)
-        if (!IsDialogMessageW(window,&message)) { TranslateMessage(&message); DispatchMessageW(&message); }
-    if (status==-1 && IsWindow(window)) SendMessage(window,WM_CLOSE,0,0);
-    return status==-1 ? 1 : (int)message.wParam;
+    WNDCLASSW wc = {0};
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = instance;
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+    wc.lpszClassName = L"OrdaQueryHeaderSample";
+    if (!RegisterClassW(&wc))
+        return 1;
+    HWND window = CreateWindowW(wc.lpszClassName,
+                                WINDOW_TITLE,
+                                WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+                                CW_USEDEFAULT,
+                                CW_USEDEFAULT,
+                                1140,
+                                650,
+                                NULL,
+                                NULL,
+                                instance,
+                                NULL);
+    if (!window)
+        return 1;
+    ShowWindow(window, show);
+    UpdateWindow(window);
+    Common::BeginCall();
+    Common::Initialize();
+    Common::EndCall(window);
+    UpdateButtons();
+    MSG message;
+    int status;
+    while ((status = GetMessageW(&message, NULL, 0, 0)) > 0)
+        if (!IsDialogMessageW(window, &message))
+        {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+    if (status == -1 && IsWindow(window))
+        SendMessage(window, WM_CLOSE, 0, 0);
+    return status == -1 ? 1 : (int)message.wParam;
 }
