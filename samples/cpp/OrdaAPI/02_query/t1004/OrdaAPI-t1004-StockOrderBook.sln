@@ -1,0 +1,19 @@
+﻿Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OrdaAPI-t1004-StockOrderBook", "OrdaAPI-t1004-StockOrderBook\OrdaAPI-t1004-StockOrderBook.vcxproj", "{33F5E447-AC1E-4752-9764-0EA63288819B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{33F5E447-AC1E-4752-9764-0EA63288819B}.Debug|Win32.ActiveCfg = Debug|Win32
+		{33F5E447-AC1E-4752-9764-0EA63288819B}.Debug|Win32.Build.0 = Debug|Win32
+		{33F5E447-AC1E-4752-9764-0EA63288819B}.Release|Win32.ActiveCfg = Release|Win32
+		{33F5E447-AC1E-4752-9764-0EA63288819B}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
