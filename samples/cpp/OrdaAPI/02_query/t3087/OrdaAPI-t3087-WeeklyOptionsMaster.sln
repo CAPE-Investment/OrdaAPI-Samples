@@ -1,0 +1,19 @@
+﻿Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OrdaAPI-t3087-WeeklyOptionsMaster", "OrdaAPI-t3087-WeeklyOptionsMaster\OrdaAPI-t3087-WeeklyOptionsMaster.vcxproj", "{44C132CD-CCEB-4144-9D1E-2979A79ECF0D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{44C132CD-CCEB-4144-9D1E-2979A79ECF0D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{44C132CD-CCEB-4144-9D1E-2979A79ECF0D}.Debug|Win32.Build.0 = Debug|Win32
+		{44C132CD-CCEB-4144-9D1E-2979A79ECF0D}.Release|Win32.ActiveCfg = Release|Win32
+		{44C132CD-CCEB-4144-9D1E-2979A79ECF0D}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

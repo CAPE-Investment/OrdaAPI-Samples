@@ -1,0 +1,19 @@
+﻿Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OrdaAPI-t3088-ELWMaster", "OrdaAPI-t3088-ELWMaster\OrdaAPI-t3088-ELWMaster.vcxproj", "{20A3CB0D-5EE7-494A-B35F-F57FFA6D2C84}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{20A3CB0D-5EE7-494A-B35F-F57FFA6D2C84}.Debug|Win32.ActiveCfg = Debug|Win32
+		{20A3CB0D-5EE7-494A-B35F-F57FFA6D2C84}.Debug|Win32.Build.0 = Debug|Win32
+		{20A3CB0D-5EE7-494A-B35F-F57FFA6D2C84}.Release|Win32.ActiveCfg = Release|Win32
+		{20A3CB0D-5EE7-494A-B35F-F57FFA6D2C84}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

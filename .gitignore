@@ -101,7 +101,9 @@ session.json
 !/docs/sample-index.md
 !/docs/troubleshooting.md
 
-# OrdaAPI 주문 샘플 테스트 폴더 제외
-/samples/cpp/OrdaAPI/05_order/tests/
-/samples/cpp/OrdaAPI/02_query/s3001/tests
-/samples/cpp/OrdaAPI/02_query/t1004/tests
+# Visual Studio build output directories
+**/Debug/
+**/Release/
+
+# Sample offline test directories
+/samples/cpp/OrdaAPI/**/tests/
