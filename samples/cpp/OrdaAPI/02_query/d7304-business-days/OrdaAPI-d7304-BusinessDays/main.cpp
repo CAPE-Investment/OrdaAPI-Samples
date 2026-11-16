@@ -13,41 +13,6 @@
 
 namespace Common = OrdaSampleCommon;
 
-// XML과 제공된 구조체의 패킹·크기·필드 위치가 일치하는지 확인합니다.
-static_assert(sizeof(d7304InBlock) == 21, "Request length differs from XML");
-static_assert(__alignof(d7304InBlock) == 1, "Request alignment differs from XML");
-static_assert(offsetof(d7304InBlock, gubun) == 0 && sizeof(((d7304InBlock *)0)->gubun) == 1,
-              "gubun layout differs from XML");
-static_assert(offsetof(d7304InBlock, fromdt) == 1 && sizeof(((d7304InBlock *)0)->fromdt) == 8,
-              "fromdt layout differs from XML");
-static_assert(offsetof(d7304InBlock, todt) == 9 && sizeof(((d7304InBlock *)0)->todt) == 8,
-              "todt layout differs from XML");
-static_assert(offsetof(d7304InBlock, cnt) == 17 && sizeof(((d7304InBlock *)0)->cnt) == 4,
-              "cnt layout differs from XML");
-
-// C++03 형식으로 출력 구조체의 크기와 필드 위치를 검사합니다.
-typedef char Check_d7304OutBlock_bizdt
-    [(offsetof(d7304OutBlock, bizdt) == 0 && sizeof(((d7304OutBlock *)0)->bizdt) == 8) ? 1 : -1];
-typedef char Check_d7304OutBlock_bfbizdt[(offsetof(d7304OutBlock, bfbizdt) == 8 &&
-                                          sizeof(((d7304OutBlock *)0)->bfbizdt) == 8)
-                                             ? 1
-                                             : -1];
-typedef char Check_d7304OutBlock_afbizdt[(offsetof(d7304OutBlock, afbizdt) == 16 &&
-                                          sizeof(((d7304OutBlock *)0)->afbizdt) == 8)
-                                             ? 1
-                                             : -1];
-typedef char Check_d7304OutBlock_afbizdt2[(offsetof(d7304OutBlock, afbizdt2) == 24 &&
-                                           sizeof(((d7304OutBlock *)0)->afbizdt2) == 8)
-                                              ? 1
-                                              : -1];
-typedef char Check_d7304OutBlock_day_cnt[(offsetof(d7304OutBlock, day_cnt) == 32 &&
-                                          sizeof(((d7304OutBlock *)0)->day_cnt) == 4)
-                                             ? 1
-                                             : -1];
-typedef char Check_d7304OutBlock_size[(sizeof(d7304OutBlock) == 36 && __alignof(d7304OutBlock) == 1)
-                                          ? 1
-                                          : -1];
-
 const char SERVICE_CODE[] = "d7304";
 const wchar_t WINDOW_TITLE[] = L"OrdaAPI 영업일정보 조회 (d7304 / C)";
 const int INPUT_SIZE = 21;

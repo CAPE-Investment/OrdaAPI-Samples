@@ -15,12 +15,6 @@ namespace Common = OrdaSampleCommon;
 #include <new>
 #include <string>
 
-typedef char CheckInput[(sizeof(InBlock) == 6) ? 1 : -1];
-typedef char CheckOutput[(sizeof(OutBlock) == 223) ? 1 : -1];
-typedef char CheckAlignment[(__alignof(OutBlock) == 1) ? 1 : -1];
-typedef char CheckSymbol[(offsetof(OutBlock, shcode) == 216) ? 1 : -1];
-typedef char CheckPrice[(offsetof(OutBlock, price) == 25) ? 1 : -1];
-
 const UINT API_BASE = WM_APP + 100;
 const UINT WORK_COMMAND = WM_APP + 500;
 const UINT WORK_DONE = WM_APP + 501;

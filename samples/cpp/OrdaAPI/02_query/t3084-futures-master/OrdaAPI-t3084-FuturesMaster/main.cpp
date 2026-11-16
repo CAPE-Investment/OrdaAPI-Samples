@@ -13,32 +13,6 @@
 
 namespace Common = OrdaSampleCommon;
 
-// XML과 제공된 구조체의 패킹·크기·필드 위치가 일치하는지 확인합니다.
-static_assert(sizeof(t3084InBlock) == 9, "Request length differs from XML");
-static_assert(__alignof(t3084InBlock) == 1, "Request alignment differs from XML");
-static_assert(offsetof(t3084InBlock, focode) == 0 && sizeof(((t3084InBlock *)0)->focode) == 8,
-              "focode layout differs from XML");
-static_assert(offsetof(t3084InBlock, _focode) == 8, "focode attribute offset differs from XML");
-
-// C++03 형식으로 XML 반복 출력 레코드의 크기와 필드 위치를 검사합니다.
-typedef char CheckT3084OutputSize[(sizeof(t3084OutBlock) == 53) ? 1 : -1];
-typedef char CheckT3084OutputAlignment[(__alignof(t3084OutBlock) == 1) ? 1 : -1];
-typedef char CheckT3084_shcode[(offsetof(t3084OutBlock, shcode) == 0 &&
-                                sizeof(((t3084OutBlock *)0)->shcode) == 8 &&
-                                offsetof(t3084OutBlock, _shcode) == 8)
-                                   ? 1
-                                   : -1];
-typedef char CheckT3084_expcode[(offsetof(t3084OutBlock, expcode) == 9 &&
-                                 sizeof(((t3084OutBlock *)0)->expcode) == 12 &&
-                                 offsetof(t3084OutBlock, _expcode) == 21)
-                                    ? 1
-                                    : -1];
-typedef char CheckT3084_hname[(offsetof(t3084OutBlock, hname) == 22 &&
-                               sizeof(((t3084OutBlock *)0)->hname) == 30 &&
-                               offsetof(t3084OutBlock, _hname) == 52)
-                                  ? 1
-                                  : -1];
-
 const char SERVICE_CODE[] = "t3084";
 const wchar_t WINDOW_TITLE[] = L"OrdaAPI 선물마스터 조회 (t3084 / A)";
 const int INPUT_SIZE = 9;

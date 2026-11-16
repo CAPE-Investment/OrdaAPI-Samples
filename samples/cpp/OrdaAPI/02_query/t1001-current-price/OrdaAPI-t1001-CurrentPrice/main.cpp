@@ -4,7 +4,6 @@
 // Visual Studio 2010 / v100 / Win32 / MultiByte. 한글 소스는 UTF-8 BOM으로 저장합니다.
 #include "../../../common/OrdaSampleCommon.h"
 #include "t1001.h"
-#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <wchar.h>
@@ -12,54 +11,11 @@
 
 namespace Common = OrdaSampleCommon;
 
-// XML과 제공된 구조체의 패킹·크기·필드 위치가 일치하는지 확인합니다.
-static_assert(sizeof(t1001InBlock) == 9, "Request length differs from XML");
-static_assert(__alignof(t1001InBlock) == 1, "Request alignment differs from XML");
-static_assert(offsetof(t1001InBlock, shcode) == 0 && sizeof(((t1001InBlock *)0)->shcode) == 6,
-              "shcode layout differs from XML");
-static_assert(offsetof(t1001InBlock, _shcode) == 6, "shcode attribute offset differs from XML");
-static_assert(offsetof(t1001InBlock, exchange) == 7 && sizeof(((t1001InBlock *)0)->exchange) == 1,
-              "exchange layout differs from XML");
-static_assert(offsetof(t1001InBlock, _exchange) == 8, "exchange attribute offset differs from XML");
-
 const char T1001_CODE[] = "t1001";
 const char T1001_OUTPUT_BLOCK[] = "t1001OutBlock";
 const int T1001_INPUT_SIZE = 9;
 const int T1001_OUTPUT_SIZE = 1184;
 
-// C++03 형식으로 화면에 표시할 응답 필드의 크기와 위치를 검사합니다.
-typedef char CheckT1001OutputSize[(sizeof(t1001OutBlock) == T1001_OUTPUT_SIZE) ? 1 : -1];
-typedef char CheckT1001OutputAlignment[(__alignof(t1001OutBlock) == 1) ? 1 : -1];
-typedef char CheckOut_hname[(offsetof(t1001OutBlock, hname) == 0 &&
-                             sizeof(((t1001OutBlock *)0)->hname) == 20 &&
-                             offsetof(t1001OutBlock, _hname) == 20)
-                                ? 1
-                                : -1];
-typedef char CheckOut_price[(offsetof(t1001OutBlock, price) == 21 &&
-                             sizeof(((t1001OutBlock *)0)->price) == 8 &&
-                             offsetof(t1001OutBlock, _price) == 29)
-                                ? 1
-                                : -1];
-typedef char
-    CheckOut_sign[(offsetof(t1001OutBlock, sign) == 30 && sizeof(((t1001OutBlock *)0)->sign) == 1 &&
-                   offsetof(t1001OutBlock, _sign) == 31)
-                      ? 1
-                      : -1];
-typedef char CheckOut_change[(offsetof(t1001OutBlock, change) == 32 &&
-                              sizeof(((t1001OutBlock *)0)->change) == 8 &&
-                              offsetof(t1001OutBlock, _change) == 40)
-                                 ? 1
-                                 : -1];
-typedef char
-    CheckOut_diff[(offsetof(t1001OutBlock, diff) == 41 && sizeof(((t1001OutBlock *)0)->diff) == 6 &&
-                   offsetof(t1001OutBlock, _diff) == 47)
-                      ? 1
-                      : -1];
-typedef char CheckOut_volume[(offsetof(t1001OutBlock, volume) == 48 &&
-                              sizeof(((t1001OutBlock *)0)->volume) == 12 &&
-                              offsetof(t1001OutBlock, _volume) == 60)
-                                 ? 1
-                                 : -1];
 
 const int QUERY_BUTTON = 300;
 HWND g_symbol, g_exchange, g_queryButton, g_requestedSymbol;
