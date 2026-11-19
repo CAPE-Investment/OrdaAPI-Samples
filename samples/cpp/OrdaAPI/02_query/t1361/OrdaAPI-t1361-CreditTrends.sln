@@ -1,0 +1,19 @@
+﻿Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OrdaAPI-t1361-CreditTrends", "OrdaAPI-t1361-CreditTrends\OrdaAPI-t1361-CreditTrends.vcxproj", "{37083605-D307-5F72-8E55-C398DEB66902}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{37083605-D307-5F72-8E55-C398DEB66902}.Debug|Win32.ActiveCfg = Debug|Win32
+		{37083605-D307-5F72-8E55-C398DEB66902}.Debug|Win32.Build.0 = Debug|Win32
+		{37083605-D307-5F72-8E55-C398DEB66902}.Release|Win32.ActiveCfg = Release|Win32
+		{37083605-D307-5F72-8E55-C398DEB66902}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
