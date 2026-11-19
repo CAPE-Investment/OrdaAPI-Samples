@@ -1,0 +1,19 @@
+﻿Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OrdaAPI-t3053-OpenInterest", "OrdaAPI-t3053-OpenInterest\OrdaAPI-t3053-OpenInterest.vcxproj", "{21384ED2-D3D8-5E8A-A686-2B005A09E9A4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{21384ED2-D3D8-5E8A-A686-2B005A09E9A4}.Debug|Win32.ActiveCfg = Debug|Win32
+		{21384ED2-D3D8-5E8A-A686-2B005A09E9A4}.Debug|Win32.Build.0 = Debug|Win32
+		{21384ED2-D3D8-5E8A-A686-2B005A09E9A4}.Release|Win32.ActiveCfg = Release|Win32
+		{21384ED2-D3D8-5E8A-A686-2B005A09E9A4}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
